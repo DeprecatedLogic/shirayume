@@ -218,7 +218,7 @@ class Guild():
         if type(value) == datetime:
             self._updated_at = value
 
-class User_guild_settings():
+class UserGuildSettings():
     def __init__(self,
         user_id: int,
         guild_id: int,
@@ -343,7 +343,7 @@ class User_guild_settings():
         if type(value) == bool:
             self._user_id = value
 
-class Moderation_log():
+class ModerationLog():
     def __init__(self,
         mlog_id: int,
         guild_id: int,

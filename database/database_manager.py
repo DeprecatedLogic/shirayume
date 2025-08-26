@@ -4,6 +4,7 @@ import mysql.connector.cursor
 import mysql.connector.cursor_cext
 import dotenv
 import models
+from utils import shared
 
 if not dotenv.load_dotenv(dotenv_path = dotenv.find_dotenv(filename = ".env")):
     print("[ERROR] No environment variables set...")
@@ -53,6 +54,9 @@ def add_users(self, users: list[models.User]):
 def remove_users(self, user_ids: list[int]):
     pass
 
+def get_users_mod_logs(self, user_ids: list[int]):
+    pass
+
 def add_guilds(self, guilds: list[models.Guild]):
     pass
 
@@ -69,6 +73,9 @@ def add_moderation_logs(self, moderation_logs: list[models.Moderation_log]):
     pass
 
 def remove_moderation_logs(self, mlog_id: int):
+    pass
+
+def initialize_database_model(table: shared.Table, **kwargs):
     pass
 
 def clean_changes(self) -> bool:
