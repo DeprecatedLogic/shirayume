@@ -69,7 +69,7 @@ def link_user_to_guild(self, user_id: int, guild_id: int):
 def unlink_user_from_guild(self, user_id: int, guild_id: int):
     pass
 
-def add_moderation_logs(self, moderation_logs: list[models.Moderation_log]):
+def add_moderation_logs(self, moderation_logs: list[models.ModerationLog] | models.ModerationLog):
     pass
 
 def remove_moderation_logs(self, mlog_id: int):

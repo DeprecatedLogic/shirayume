@@ -8,10 +8,10 @@ class Table(Enum):
 
 class Action(Enum):
     warn = "warn"
-    mute = "mute"
+    mute = "timeout"
     kick = "kick"
     ban = "ban"
-    unmute = "unmute"
+    unmute = "untimeout"
     unban = "unban"
 
 class RPS(Enum):
