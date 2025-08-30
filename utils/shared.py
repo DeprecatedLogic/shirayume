@@ -13,6 +13,7 @@ class Action(Enum):
     ban = "ban"
     unmute = "untimeout"
     unban = "unban"
+    purge = "purge"
 
 class RPS(Enum):
     rock = "rock"
