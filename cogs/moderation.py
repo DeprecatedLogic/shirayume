@@ -3,7 +3,7 @@ from services import moderation_service
 import discord
 from discord import app_commands
 from discord.ext import commands
-from utils import shared
+from utils import shared, helpers
 
 #GLOBAL
 now_utc = datetime.now(timezone.utc)
@@ -18,7 +18,12 @@ class Moderation(commands.Cog):
     async def kick_member(self, interaction: discord.Interaction, member: discord.Member, reason: str = "No reason provided"):
         try:
             await member.kick(reason=reason)
-            await interaction.response.send_message(f"{member.mention} has been kicked. Reason: {reason}")
+            embed = helpers.embed_generator(
+                title = "Kick",
+                description = f"{member.mention} has been sent to touch grass. Reason: {reason}",
+                colour = (205, 85, 0)
+            )
+            await interaction.response.send_message(embed = embed)
 
             moderation_service.import_moderation_logs(
             mlog_id = -1,
@@ -34,10 +39,18 @@ class Moderation(commands.Cog):
             )
 
         except discord.Forbidden:
-            await interaction.response.send_message("You don't have permission to kick this member.", ephemeral=True)
+            embed = helpers.embed_generator(
+                title = "Kick",
+                description = "You don't have permission to kick this member."
+            )
+            await interaction.response.send_message(embed = embed, ephemeral=True)
 
         except Exception as e:
-            await interaction.response.send_message(f"Failed to kick {member.mention}. Error: {e}", ephemeral=True)
+            embed = helpers.embed_generator(
+                title = "Kick",
+                description = f"Failed to kick {member.mention}. Error: {e}",
+            )
+            await interaction.response.send_message(embed = embed, ephemeral=True)
 
 
     @app_commands.command(name="ban", description="Ban a member from the server")
@@ -45,7 +58,12 @@ class Moderation(commands.Cog):
     async def ban_member(self, interaction: discord.Interaction, member: discord.Member, reason: str = "No reason provided"):
         try:
             await member.ban(reason=reason)
-            await interaction.response.send_message(f"{member.mention} has been banned. Reason: {reason}")
+            embed = helpers.embed_generator(
+                title = "Ban",
+                description = f"{member.mention} went for milk. Reason: {reason}",
+                colour = (255, 0, 0)
+            )
+            await interaction.response.send_message(embed = embed)
 
             moderation_service.import_moderation_logs(
             mlog_id = -1,
@@ -61,10 +79,18 @@ class Moderation(commands.Cog):
             )
 
         except discord.Forbidden:
-            await interaction.response.send_message("You don't have permission to ban this member.", ephemeral=True)
+            embed = helpers.embed_generator(
+                title = "Ban",
+                description = "You don't have permission to ban this member.",
+            )
+            await interaction.response.send_message(embed = embed, ephemeral=True)
 
         except Exception as e:
-            await interaction.response.send_message(f"Failed to ban {member.mention}. Error: {e}", ephemeral=True)
+            embed = helpers.embed_generator(
+                title = "Ban",
+                description = f"Failed to ban {member.mention}. Error: {e}",
+            )
+            await interaction.response.send_message(embed = embed, ephemeral=True)
 
 
     @app_commands.command(name="unban", description="Unban a member from the server")
@@ -72,7 +98,12 @@ class Moderation(commands.Cog):
     async def unban_member(self, interaction: discord.Interaction, user: discord.User):
         try:
             await interaction.guild.unban(user)
-            await interaction.response.send_message(f"{user.mention} has been unbanned.")
+            embed = helpers.embed_generator(
+                title = "Ban",
+                description = f"{user.mention} has returned with the milk.",
+                colour = (0, 255, 0)
+            )
+            await interaction.response.send_message(embed = embed)
 
             moderation_service.import_moderation_logs(
             mlog_id = -1,
@@ -88,10 +119,18 @@ class Moderation(commands.Cog):
             )
 
         except discord.Forbidden:
-            await interaction.response.send_message("You don't have permission to unban this member.", ephemeral=True)
+            embed = helpers.embed_generator(
+                title = "Ban",
+                description = "You don't have permission to unban this member.",
+            )
+            await interaction.response.send_message(embed = embed, ephemeral=True)
 
         except Exception as e:
-            await interaction.response.send_message(f"Failed to unban {user.mention}. Error: {e}", ephemeral=True)
+            embed = helpers.embed_generator(
+                title = "Ban",
+                description = f"Failed to unban {user.mention}. Error: {e}",
+            )
+            await interaction.response.send_message(embed = embed, ephemeral=True)
 
 
     @app_commands.command(name="timeout", description="Timeout a member for a custom duration")
@@ -101,15 +140,22 @@ class Moderation(commands.Cog):
         duration = timedelta(hours=hours, minutes=minutes, seconds=seconds)
 
         if duration.total_seconds() <= 0:
-            return await interaction.response.send_message("Duration must be greater than 0.", ephemeral=True)
+            embed = helpers.embed_generator(
+                title = "Timeout",
+                description = "Duration must be greater than 0.",
+            )
+            return await interaction.response.send_message(embed = embed, ephemeral=True)
 
         until = discord.utils.utcnow() + duration
 
         try:
             await member.timeout(until, reason=reason)
-            await interaction.response.send_message(
-                f"{member.mention} has been timed out for {hours}h {minutes}m {seconds}s. Reason: {reason}"
+            embed = helpers.embed_generator(
+                title = "Timeout",
+                description = f"{member.mention} has lost speech priveleges for {hours}h {minutes}m {seconds}s. Reason: {reason}",
+                colour = (255, 200, 0)
             )
+            await interaction.response.send_message(embed = embed)
 
             moderation_service.import_moderation_logs(
             mlog_id = -1,
@@ -125,22 +171,38 @@ class Moderation(commands.Cog):
             )   
             
         except discord.Forbidden:
-            await interaction.response.send_message("You don't have permission to timeout this member.", ephemeral=True)
+            embed = helpers.embed_generator(
+                title = "Timeout",
+                description = "You don't have permission to timeout this member.",
+            )
+            await interaction.response.send_message(embed = embed, ephemeral=True)
 
         except Exception as e:
-            await interaction.response.send_message(f"Failed to timeout {member.mention}. Error: {e}", ephemeral=True)   
+            embed = helpers.embed_generator(
+                title = "Timeout",
+                description = f"Failed to timeout {member.mention}. Error: {e}",
+            )
+            await interaction.response.send_message(embed = embed, ephemeral=True)   
 
 
     @app_commands.command(name="untimeout", description="Remove timeout from a member")
     @app_commands.checks.has_permissions(moderate_members=True)
     async def untimeout_member(self, interaction: discord.Interaction, member: discord.Member, reason: str = "No reason provided"):
         if not member.timed_out_until:
-            return await interaction.response.send_message(
-                f"{member.mention} is not currently timed out.", ephemeral=True)
+            embed = helpers.embed_generator(
+                title = "Untimeout",
+                description = f"{member.mention} is not currently timed out.",
+            )
+            return await interaction.response.send_message(embed = embed, ephemeral=True)
         
         try:
             await member.timeout(None, reason=reason)
-            await interaction.response.send_message(f"Timeout removed for {member.mention} . Reason: {reason}")
+            embed = helpers.embed_generator(
+                title = "Untimeout",
+                description = f"Timeout removed for {member.mention} . Reason: {reason}",
+                colour = (255, 200, 0)
+            )
+            await interaction.response.send_message(embed = embed)
 
             moderation_service.import_moderation_logs(
             mlog_id = -1,
@@ -156,17 +218,30 @@ class Moderation(commands.Cog):
             )
 
         except discord.Forbidden:
-            await interaction.response.send_message("You don't have permission to remove this member's timeout.", ephemeral=True)
+            embed = helpers.embed_generator(
+                title = "Untimeout",
+                description = "You don't have permission to remove this member's timeout.",
+            )
+            await interaction.response.send_message(embed = embed, ephemeral=True)
 
         except Exception as e:
-            await interaction.response.send_message(f"Failed to remove timeout for {member.mention}. Error: {e}", ephemeral=True)
+            embed = helpers.embed_generator(
+                title = "Untimeout",
+                description = f"Failed to remove timeout for {member.mention}. Error: {e}",
+            )
+            await interaction.response.send_message(embed = embed, ephemeral=True)
 
 
     @app_commands.command(name="warn", description="Warn a member")
     @app_commands.checks.has_permissions(moderate_members=True)
     async def warn_member(self, interaction: discord.Interaction, member: discord.Member, reason: str = "No reason provided"):
         try:
-            await interaction.response.send_message(f"{member.mention} has been warned. Reason: {reason}")
+            embed = helpers.embed_generator(
+                title = "Warn",
+                description = f"{member.mention} has been warned. Reason: {reason}",
+                colour = (255, 85, 0)
+            )
+            await interaction.response.send_message(embed = embed)
 
             moderation_service.import_moderation_logs(
             mlog_id = -1,
@@ -182,17 +257,29 @@ class Moderation(commands.Cog):
             )
             
         except discord.Forbidden:
-            await interaction.response.send_message("You don't have permission to warn this member.", ephemeral=True)
+            embed = helpers.embed_generator(
+                title = "Warn",
+                description = "You don't have permission to warn this member.",
+            )
+            await interaction.response.send_message(embed = embed, ephemeral=True)
 
         except Exception as e:
-            await interaction.response.send_message(f"Failed to warn {member.mention}. Error: {e}", ephemeral=True)
+            embed = helpers.embed_generator(
+                title = "Warn",
+                description = f"Failed to warn {member.mention}. Error: {e}",
+            )
+            await interaction.response.send_message(embed = embed, ephemeral=True)
 
 
     @app_commands.command(name="purge-messages", description="Purge messages from a member in the current channel")
     @app_commands.checks.has_permissions(manage_messages=True)
     async def purge_messages_from_member(self, interaction: discord.Interaction, member: discord.Member, amount: int):
         if amount < 1 or amount > 100:
-            return await interaction.response.send_message("Please provide an amount between 1 and 100.", ephemeral=True)
+            embed = helpers.embed_generator(
+                title = "Purge",
+                description = "Please provide an amount between 1 and 100.",
+            )
+            return await interaction.response.send_message(embed = embed, ephemeral=True)
 
         await interaction.response.defer(ephemeral=True)
 
@@ -201,7 +288,11 @@ class Moderation(commands.Cog):
 
             deleted = await channel.purge(limit=amount, check=lambda m: m.author.id == member.id)
 
-            await interaction.followup.send(f"Deleted {len(deleted)} messages from {member.mention}.", ephemeral=True)
+            embed = helpers.embed_generator(
+                title = "Purge",
+                description = f"Deleted {len(deleted)} messages from {member.mention}.",
+            )
+            await interaction.followup.send(embed = embed, ephemeral=True)
 
             moderation_service.import_moderation_logs(
             mlog_id = -1,
@@ -217,10 +308,18 @@ class Moderation(commands.Cog):
             )
 
         except discord.Forbidden:
-            await interaction.followup.send("You don't have permission to purge messages in this channel.", ephemeral=True)
+            embed = helpers.embed_generator(
+                title = "Purge",
+                description = "You don't have permission to purge messages in this channel.",
+            )
+            await interaction.followup.send(embed = embed, ephemeral=True)
 
         except Exception as e:
-            await interaction.followup.send(f"Failed to purge messages. Error: {e}", ephemeral=True)
+            embed = helpers.embed_generator(
+                title = "Purge",
+                description = f"Failed to purge messages. Error: {e}",
+            )
+            await interaction.followup.send(embed = embed, ephemeral=True)
 
 
 async def setup(bot: commands.Bot):

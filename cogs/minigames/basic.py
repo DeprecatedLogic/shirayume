@@ -1,28 +1,39 @@
+import discord
+from discord import app_commands
+from discord.ext import commands
 from utils import shared
 
-def coin_flip(first_pick: shared.CoinFlip, second_pick: shared.CoinFlip):
-    pass
 
-def roll_dice(from_number: int | None, to_number: int | None):
-    pass
+class Minigames(commands.Cog):
+    def __init__(self, bot: commands.Bot):
+        self.bot = bot
 
-def guess_the_number(from_number: int | None, to_number: int | None):
-    pass
+    def coin_flip(first_pick: shared.CoinFlip, second_pick: shared.CoinFlip):
+        pass
 
-def rock_paper_scissors(first_pick: shared.RPS, second_pick: shared.RPS):
-    pass
+    def roll_dice(from_number: int | None, to_number: int | None):
+        pass
 
-def word_scramble(language: str):
-    pass
+    def guess_the_number(from_number: int | None, to_number: int | None):
+        pass
 
-def hangman():
-    pass
+    def rock_paper_scissors(first_pick: shared.RPS, second_pick: shared.RPS):
+        pass
 
-def typing_race():
-    pass
+    def word_scramble(language: str):
+        pass
 
-def lucky_seven():
-    pass
+    def hangman():
+        pass
 
-def event():
-    pass
+    def typing_race():
+        pass
+
+    def lucky_seven():
+        pass
+
+    def event():
+        pass
+
+async def setup(bot: commands.Bot):
+    await bot.add_cog(Minigames(bot))
