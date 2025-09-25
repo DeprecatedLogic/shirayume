@@ -1,3 +1,10 @@
+"""
+Notes
+-----
+
+The `is_dirty` variable helps to manage resources better when commiting to the database
+"""
+
 from datetime import datetime
 from utils.shared import Action
 
@@ -10,7 +17,8 @@ class User():
         is_bot: bool,
         currency: int,
         created_at: datetime,
-        updated_at: datetime
+        updated_at: datetime,
+        is_dirty: bool
     ) -> None:
         self.user_id = user_id
         self.username = username
@@ -20,6 +28,21 @@ class User():
         self.currency = currency
         self.created_at = created_at
         self.updated_at = updated_at
+        self.is_dirty = is_dirty
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "User" | None:
+        if type(data) is dict:
+            return cls(
+                user_id = data["user_id"],
+                username = data["username"],
+                discriminator = data["discriminator"],
+                avatar_url = data["avatar_url"],
+                is_bot = data["is_bot"],
+                currency = data["currency"],
+                created_at = data["created_at"],
+                updated_at = data["updated_at"]
+            )
 
     @property
     def user_id(self):
@@ -93,6 +116,15 @@ class User():
         if type(value) == datetime:
             self._updated_at = value
 
+    @property
+    def is_dirty(self):
+        return self._is_modified
+    
+    @is_dirty.setter
+    def is_dirty(self, value: bool):
+        if type(value) == bool:
+            self._is_modified = value
+
 class Guild():
     def __init__(self,
         guild_id: int,
@@ -105,7 +137,8 @@ class Guild():
         welcome_channel: int,
         joined_at: datetime,
         created_at: datetime,
-        updated_at: datetime
+        updated_at: datetime,
+        is_dirty: bool
     ) -> None:
         self.guild_id = guild_id
         self.owner_id = owner_id
@@ -118,6 +151,24 @@ class Guild():
         self.joined_at = joined_at
         self.created_at = created_at
         self.updated_at = updated_at
+        self.is_dirty = is_dirty
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "Guild" | None:
+        if type(data) is dict:
+            return cls(
+                guild_id = data["guild_id"],
+                owner_id = data["owner_id"],
+                name = data["name"],
+                icon_url = data["icon_url"],
+                member_count = data["memebr_count"],
+                bot_count = data["bot_count"],
+                is_available = data["is_available"],
+                welcome_channel = data["welcome_channel"],
+                joined_at = data["joined_at"],
+                created_at = data["created_at"],
+                updated_at = data["updated_at"]
+            )
 
     @property
     def guild_id(self):
@@ -218,6 +269,15 @@ class Guild():
         if type(value) == datetime:
             self._updated_at = value
 
+    @property
+    def is_dirty(self):
+        return self._is_modified
+    
+    @is_dirty.setter
+    def is_dirty(self, value: bool):
+        if type(value) == bool:
+            self._is_modified = value
+
 class UserGuildSettings():
     def __init__(self,
         user_id: int,
@@ -230,7 +290,8 @@ class UserGuildSettings():
         last_xp_message: datetime,
         created_at: datetime,
         updated_at: datetime,
-        is_member: bool
+        is_member: bool,
+        is_dirty: bool
     ) -> None:
         self.user_id = user_id
         self.guild_id = guild_id
@@ -243,6 +304,24 @@ class UserGuildSettings():
         self.created_at = created_at
         self.updated_at = updated_at
         self.is_member = is_member
+        self.is_dirty = is_dirty
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "UserGuildSettings" | None:
+        if type(data) is dict:
+            return cls(
+                user_id = data["user_id"],
+                guild_id = data["guild_id"],
+                joined_at = data["joined_at"],
+                last_interaction = data["last_interaction"],
+                experience = data["experience"],
+                level = data["level"],
+                custom_title = data["custom_title"],
+                last_xp_message = data["last_xp_message"],
+                created_at = data["created_at"],
+                updated_at = data["updated_at"],
+                is_member = data["is_member"]
+            )
 
     @property
     def user_id(self):
@@ -343,6 +422,15 @@ class UserGuildSettings():
         if type(value) == bool:
             self._user_id = value
 
+    @property
+    def is_dirty(self):
+        return self._is_modified
+    
+    @is_dirty.setter
+    def is_dirty(self, value: bool):
+        if type(value) == bool:
+            self._is_modified = value
+
 class ModerationLog():
     def __init__(self,
         mlog_id: int,
@@ -354,7 +442,8 @@ class ModerationLog():
         action_timestamp: datetime,
         duration_minutes: int,
         is_active: bool,
-        pardoned: bool
+        pardoned: bool,
+        is_dirty: bool
     ) -> None:
         self.mlog_id = mlog_id
         self.guild_id = guild_id
@@ -366,6 +455,23 @@ class ModerationLog():
         self.duration_minutes = duration_minutes
         self.is_active = is_active
         self.pardoned = pardoned
+        self.is_dirty = is_dirty
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "UserGuildSettings" | None:
+        if type(data) is dict:
+            return cls(
+                mlog_id = data["mlog_id"],
+                guild_id = data["guild_id"],
+                user_id = data["user_id"],
+                moderator_id = data["moderator_id"],
+                action_type = data["action_type"],
+                reason = data["reason"],
+                action_timestamp = data["action_timestamp"],
+                duration_minutes = data["duration_minutes"],
+                is_active = data["is_active"],
+                pardoned = data["pardoned"]
+            )
 
     @property
     def mlog_id(self):
@@ -456,3 +562,12 @@ class ModerationLog():
     def pardoned(self, value: bool):
         if type(value) == bool:
             self._pardoned = value
+
+    @property
+    def is_dirty(self):
+        return self._is_modified
+    
+    @is_dirty.setter
+    def is_dirty(self, value: bool):
+        if type(value) == bool:
+            self._is_modified = value
