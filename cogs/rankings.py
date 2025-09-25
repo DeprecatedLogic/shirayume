@@ -1,15 +1,15 @@
+from services import rankings_service
 import discord
 from discord.ext import commands
+from utils import shared
 
-class Shop():
+class Rankings(commands.Cog):
     
-    def __init__(self):
-        pass
-
-class Economy(commands.Cog):
-
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+        self.users = []
+
+    
 
 def setup(bot: commands.Bot, config: dict):
-    pass
+    bot.add_cog()
