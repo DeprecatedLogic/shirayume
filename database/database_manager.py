@@ -1,10 +1,10 @@
 import os
 import mysql.connector
 import mysql.connector.cursor_cext
-import models
+from . import models
 from utils import shared
 
-DB_MANAGER: "DatabaseManager" | None = None
+DB_MANAGER = None 
 
 class DatabaseManager():
 

@@ -11,11 +11,11 @@ def launch():
         print("[ERROR] No environment variables set...")
         exit()
 
-    DB_HOST = {os.environ["DB_HOST"]},
-    DB_USER = {os.environ["DB_USER"]},
-    DB_PASSWORD = {os.environ["DB_PASSWORD"]},
-    DATABASE = {os.environ["DATABASE"]},
-    DISCORD_BOT_TOKEN = {os.environ["DISCORD_BOT_TOKEN"]}
+    DB_HOST = os.environ["DB_HOST"]
+    DB_USER = os.environ["DB_USER"]
+    DB_PASSWORD = os.environ["DB_PASSWORD"]
+    DATABASE = os.environ["DATABASE"]
+    DISCORD_BOT_TOKEN = os.environ["DISCORD_BOT_TOKEN"]
 
     # Debugging output
     print(
@@ -28,12 +28,12 @@ def launch():
 
     bot = commands.Bot("EXE>", intents = discord.Intents.all())
 
-    database_manager.setup()
+    #database_manager.setup()
 
     with open("config.json", "r") as config_file:
         config = json.load(config_file)
 
-    #moderation.setup(bot, config)
+    moderation.setup(bot)
     #economy.setup(bot, config)
     #polls.setup(bot, config)
     #rankings.setup(bot, config)

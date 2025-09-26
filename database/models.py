@@ -1,10 +1,3 @@
-"""
-Notes
------
-
-The `is_dirty` variable helps to manage resources better when commiting to the database
-"""
-
 from datetime import datetime
 from utils.shared import Action
 
@@ -31,7 +24,7 @@ class User():
         self.is_dirty = is_dirty
 
     @classmethod
-    def from_dict(cls, data: dict) -> "User" | None:
+    def from_dict(cls, data: dict):
         if type(data) is dict:
             return cls(
                 user_id = data["user_id"],
@@ -154,7 +147,7 @@ class Guild():
         self.is_dirty = is_dirty
 
     @classmethod
-    def from_dict(cls, data: dict) -> "Guild" | None:
+    def from_dict(cls, data: dict):
         if type(data) is dict:
             return cls(
                 guild_id = data["guild_id"],
@@ -307,7 +300,7 @@ class UserGuildSettings():
         self.is_dirty = is_dirty
 
     @classmethod
-    def from_dict(cls, data: dict) -> "UserGuildSettings" | None:
+    def from_dict(cls, data: dict):
         if type(data) is dict:
             return cls(
                 user_id = data["user_id"],
@@ -458,7 +451,7 @@ class ModerationLog():
         self.is_dirty = is_dirty
 
     @classmethod
-    def from_dict(cls, data: dict) -> "UserGuildSettings" | None:
+    def from_dict(cls, data: dict):
         if type(data) is dict:
             return cls(
                 mlog_id = data["mlog_id"],
