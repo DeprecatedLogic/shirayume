@@ -34,7 +34,8 @@ class User():
                 is_bot = data["is_bot"],
                 currency = data["currency"],
                 created_at = data["created_at"],
-                updated_at = data["updated_at"]
+                updated_at = data["updated_at"],
+                is_dirty = data.get("is_dirty", False)
             )
 
     @property
@@ -111,12 +112,12 @@ class User():
 
     @property
     def is_dirty(self):
-        return self._is_modified
+        return self._is_dirty
     
     @is_dirty.setter
     def is_dirty(self, value: bool):
         if type(value) == bool:
-            self._is_modified = value
+            self._is_dirty = value
 
 class Guild():
     def __init__(self,
@@ -160,7 +161,8 @@ class Guild():
                 welcome_channel = data["welcome_channel"],
                 joined_at = data["joined_at"],
                 created_at = data["created_at"],
-                updated_at = data["updated_at"]
+                updated_at = data["updated_at"],
+                is_dirty = data.get("is_dirty", False)
             )
 
     @property
@@ -264,12 +266,12 @@ class Guild():
 
     @property
     def is_dirty(self):
-        return self._is_modified
+        return self._is_dirty
     
     @is_dirty.setter
     def is_dirty(self, value: bool):
         if type(value) == bool:
-            self._is_modified = value
+            self._is_dirty = value
 
 class UserGuildSettings():
     def __init__(self,
@@ -313,7 +315,8 @@ class UserGuildSettings():
                 last_xp_message = data["last_xp_message"],
                 created_at = data["created_at"],
                 updated_at = data["updated_at"],
-                is_member = data["is_member"]
+                is_member = data["is_member"],
+                is_dirty = data.get("is_dirty", False)
             )
 
     @property
@@ -327,102 +330,102 @@ class UserGuildSettings():
 
     @property
     def guild_id(self):
-        return self._user_id
+        return self._guild_id
 
     @guild_id.setter
     def guild_id(self, value: int):
         if type(value) == int:
-            self._user_id = value
+            self._guild_id = value
 
     @property
     def joined_at(self):
-        return self._user_id
+        return self._joined_at
 
     @joined_at.setter
     def joined_at(self, value: datetime):
         if type(value) == datetime:
-            self._user_id = value
+            self._joined_at = value
 
     @property
     def last_interaction(self):
-        return self._user_id
+        return self._last_interaction
 
     @last_interaction.setter
     def last_interaction(self, value: datetime):
         if type(value) == datetime:
-            self._user_id = value
+            self._last_interaction = value
 
     @property
     def experience(self):
-        return self._user_id
+        return self._experience
 
     @experience.setter
     def experience(self, value: int):
         if type(value) == int:
-            self._user_id = value
+            self._experience = value
 
     @property
     def level(self):
-        return self._user_id
+        return self._level
 
     @level.setter
     def level(self, value: int):
         if type(value) == int:
-            self._user_id = value
+            self._level = value
 
     @property
     def custom_title(self):
-        return self._user_id
+        return self._custom_title
 
     @custom_title.setter
     def custom_title(self, value: str):
         if type(value) == str:
-            self._user_id = value
+            self._custom_title = value
 
     @property
     def last_xp_message(self):
-        return self._user_id
+        return self._last_xp_message
 
     @last_xp_message.setter
     def last_xp_message(self, value: datetime):
         if type(value) == datetime:
-            self._user_id = value
+            self._last_xp_message = value
 
     @property
     def created_at(self):
-        return self._user_id
+        return self._created_at
 
     @created_at.setter
     def created_at(self, value: datetime):
         if type(value) == datetime:
-            self._user_id = value
+            self._created_at = value
 
     @property
     def updated_at(self):
-        return self._user_id
+        return self._updated_at
 
     @updated_at.setter
     def updated_at(self, value: datetime):
         if type(value) == datetime:
-            self._user_id = value
+            self._updated_at = value
 
     @property
     def is_member(self):
-        return self._user_id
+        return self._is_member
 
     @is_member.setter
     def is_member(self, value: bool):
         if type(value) == bool:
-            self._user_id = value
+            self._is_member = value
 
     @property
     def is_dirty(self):
-        return self._is_modified
+        return self._is_dirty
     
     @is_dirty.setter
     def is_dirty(self, value: bool):
         if type(value) == bool:
-            self._is_modified = value
+            self._is_dirty = value
 
 class ModerationLog():
     def __init__(self,
@@ -463,7 +466,8 @@ class ModerationLog():
                 action_timestamp = data["action_timestamp"],
                 duration_minutes = data["duration_minutes"],
                 is_active = data["is_active"],
-                pardoned = data["pardoned"]
+                pardoned = data["pardoned"],
+                is_dirty = data.get("is_dirty", False)
             )
 
     @property
@@ -558,9 +562,9 @@ class ModerationLog():
 
     @property
     def is_dirty(self):
-        return self._is_modified
+        return self._is_dirty
     
     @is_dirty.setter
     def is_dirty(self, value: bool):
         if type(value) == bool:
-            self._is_modified = value
+            self._is_dirty = value
