@@ -10,3 +10,10 @@ def embed_generator(title: str, description:str, colour: tuple[int, int, int] = 
     )
 
     return embed
+
+def remove_characters(string: str, chars_to_remove: str) -> str:
+    # Create a translation table directly without using str.maketrans
+    translation_table = {ord(char): None for char in chars_to_remove}
+
+    # Use translate to remove specified characters and return the string
+    return string.translate(translation_table)
