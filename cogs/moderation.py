@@ -21,7 +21,7 @@ class Moderation(commands.Cog):
             embed = helpers.embed_generator(
                 title = "Kick",
                 description = f"{member.mention} has been sent to touch grass. Reason: {reason}",
-                colour = (205, 85, 0)
+                color = (205, 85, 0)
             )
             await interaction.response.send_message(embed = embed)
 
@@ -61,7 +61,7 @@ class Moderation(commands.Cog):
             embed = helpers.embed_generator(
                 title = "Ban",
                 description = f"{member.mention} went for milk. Reason: {reason}",
-                colour = (255, 0, 0)
+                color = (255, 0, 0)
             )
             await interaction.response.send_message(embed = embed)
 
@@ -101,7 +101,7 @@ class Moderation(commands.Cog):
             embed = helpers.embed_generator(
                 title = "Ban",
                 description = f"{user.mention} has returned with the milk.",
-                colour = (0, 255, 0)
+                color = (0, 255, 0)
             )
             await interaction.response.send_message(embed = embed)
 
@@ -153,7 +153,7 @@ class Moderation(commands.Cog):
             embed = helpers.embed_generator(
                 title = "Timeout",
                 description = f"{member.mention} has lost speech priveleges for {hours}h {minutes}m {seconds}s. Reason: {reason}",
-                colour = (255, 200, 0)
+                color = (255, 200, 0)
             )
             await interaction.response.send_message(embed = embed)
 
@@ -200,7 +200,7 @@ class Moderation(commands.Cog):
             embed = helpers.embed_generator(
                 title = "Untimeout",
                 description = f"Timeout removed for {member.mention} . Reason: {reason}",
-                colour = (255, 200, 0)
+                color = (255, 200, 0)
             )
             await interaction.response.send_message(embed = embed)
 
@@ -239,7 +239,7 @@ class Moderation(commands.Cog):
             embed = helpers.embed_generator(
                 title = "Warn",
                 description = f"{member.mention} has been warned. Reason: {reason}",
-                colour = (255, 85, 0)
+                color = (255, 85, 0)
             )
             await interaction.response.send_message(embed = embed)
 
