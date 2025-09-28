@@ -1,5 +1,5 @@
 import requests
-from shared import SupportedWebsites
+from utils.shared import SupportedWebsites
 from bs4 import BeautifulSoup
 import re
 
