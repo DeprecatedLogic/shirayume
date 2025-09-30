@@ -1,14 +1,45 @@
 from enum import Enum
+import blessed
+GLOBAL_TERMINAL = blessed.Terminal()
+
+class LogLevel(Enum):
+    """ Defines logging levels with priority. """
+
+    DEBUG = (1, (169, 169, 169))
+    INFO = (2, (30, 144, 255))
+    WARNING = (3, (255, 165, 0))
+    ERROR = (4, (220, 20, 60))
+    CRITICAL = (5, (255, 0, 0))
+
+    @property
+    def priority(self) -> int:
+        """ Returns the integer priority. """
+        return self.value[0]
+
+    @property
+    def color_rgb(self) -> tuple[int, int, int]:
+        """ Returns the (R, G, B) tuple. """
+        return self.value[1]
+
+    def __str__(self):
+        """ Returns the uppercase name (e.g., 'DEBUG') when converted to string. """
+        return self.name
+    
+    def __lt__(self, other):
+        """ Compares based on priority. """
+        if self.__class__ is other.__class__:
+            return self.priority < other.priority
+        return NotImplemented
 
 class Table(Enum):
-    """ Database table names. """
+    """ Defines database tables. """
     user = "user"
     guild = "guild"
     user_guild_settings = "user_guild_settings"
     moderation_log = "moderation_log"
 
 class Action(Enum):
-    """ Actions that the discord bot can take. """
+    """ Defines actions that the discord bot can take. """
     warn = "warn"
     mute = "timeout"
     kick = "kick"
@@ -18,18 +49,18 @@ class Action(Enum):
     purge = "purge"
 
 class RPS(Enum):
-    """ Rock-paper-scissors options. """
+    """ Defines rock-paper-scissors options. """
     rock = "rock"
     paper = "paper"
     scissors = "scissors"
 
 class CoinFlip(Enum):
-    """ The only results possible for a coin flip! """
+    """ Defines the only results possible for a coin flip! """
     heads = "heads"
     tails = "tails"
 
 class Rank(Enum):
-    """ All available rank titles. """
+    """ Defines all available rank titles. """
     rank_0 = ""
     rank_1 = ""
     rank_2 = ""
@@ -41,12 +72,8 @@ class Rank(Enum):
     rank_8 = ""
     rank_9 = ""
     rank_10 = ""
-    rank_11 = ""
-    rank_12 = ""
-    rank_13 = ""
-    rank_14 = ""
 
 class SupportedWebsites(Enum):
-    """ Websites supported for scraping. """
+    """ Defines supported websites for scraping. """
     my_anime_list = "MyAnimeList"
     brainy_quote = "BrainyQuote"
