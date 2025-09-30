@@ -1,4 +1,4 @@
-from enum import Enum
+from enum import Enum, auto
 import blessed
 GLOBAL_TERMINAL = blessed.Terminal()
 
@@ -33,47 +33,53 @@ class LogLevel(Enum):
 
 class Table(Enum):
     """ Defines database tables. """
-    user = "user"
-    guild = "guild"
-    user_guild_settings = "user_guild_settings"
-    moderation_log = "moderation_log"
+    user = auto()
+    guild = auto()
+    user_guild_settings = auto()
+    moderation_log = auto()
 
 class Action(Enum):
     """ Defines actions that the discord bot can take. """
-    warn = "warn"
-    mute = "timeout"
-    kick = "kick"
-    ban = "ban"
-    unmute = "untimeout"
-    unban = "unban"
-    purge = "purge"
+    warn = auto()
+    mute = auto()
+    kick = auto()
+    ban = auto()
+    unmute = auto()
+    unban = auto()
+    purge = auto()
 
 class RPS(Enum):
     """ Defines rock-paper-scissors options. """
-    rock = "rock"
-    paper = "paper"
-    scissors = "scissors"
+    rock = auto()
+    paper = auto()
+    scissors = auto()
 
 class CoinFlip(Enum):
     """ Defines the only results possible for a coin flip! """
-    heads = "heads"
-    tails = "tails"
+    heads = auto()
+    tails = auto()
 
 class Rank(Enum):
     """ Defines all available rank titles. """
     rank_0 = ""
-    rank_1 = ""
-    rank_2 = ""
-    rank_3 = ""
-    rank_4 = ""
-    rank_5 = ""
-    rank_6 = ""
-    rank_7 = ""
-    rank_8 = ""
-    rank_9 = ""
     rank_10 = ""
+    rank_20 = ""
+    rank_30 = ""
+    rank_40 = ""
+    rank_50 = ""
+    rank_60 = ""
+    rank_70 = ""
+    rank_80 = ""
+    rank_90 = ""
+    rank_100 = ""
+
+    def __str__(self):
+        return self.name.split('_', maxsplit = 1)[1]
 
 class SupportedWebsites(Enum):
     """ Defines supported websites for scraping. """
     my_anime_list = "MyAnimeList"
     brainy_quote = "BrainyQuote"
+
+    def __str__(self):
+        return self.value
