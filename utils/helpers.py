@@ -1,5 +1,6 @@
 import discord
 from datetime import datetime
+import asyncio
 import shared
 
 def embed_generator(title: str, description:str, color: tuple[int, int, int] = (255,255,255)) -> discord.Embed:
@@ -42,3 +43,7 @@ def custom_print(
         default_fg,
         flush = True
     )
+
+async def exec_in_thread(thread_pool, func, *args, **kwargs):
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(thread_pool, func, *args, **kwargs)
