@@ -2,6 +2,8 @@ from datetime import datetime
 from utils.shared import Action
 
 class User():
+    instance_counter = 0
+
     def __init__(self,
         user_id: int,
         username: str,
@@ -11,7 +13,8 @@ class User():
         currency: int,
         created_at: datetime,
         updated_at: datetime,
-        is_dirty: bool
+        is_dirty: bool,
+        is_deleted: bool
     ) -> None:
         self.user_id = user_id
         self.username = username
@@ -22,6 +25,8 @@ class User():
         self.created_at = created_at
         self.updated_at = updated_at
         self.is_dirty = is_dirty
+        self.is_deleted = is_deleted
+        User.instance_counter += 1
 
     @classmethod
     def from_dict(cls, data: dict):
@@ -34,9 +39,13 @@ class User():
                 is_bot = data["is_bot"],
                 currency = data["currency"],
                 created_at = data["created_at"],
-                updated_at = data["updated_at"],
-                is_dirty = data.get("is_dirty", False)
+                updated_at = data.get("updated_at", data["created_at"]),
+                is_dirty = data.get("is_dirty", False),
+                is_deleted = data.get("is_deleted", False)
             )
+
+    def compare(self, model: "User") -> bool:
+        return self.user_id == model.user_id
 
     @property
     def user_id(self):
@@ -118,8 +127,19 @@ class User():
     def is_dirty(self, value: bool):
         if type(value) == bool:
             self._is_dirty = value
+    
+    @property
+    def is_deleted(self):
+        return self._is_deleted
+    
+    @is_deleted.setter
+    def is_deleted(self, value: bool):
+        if type(value) == bool:
+            self._is_deleted = value
 
 class Guild():
+    instance_counter = 0
+
     def __init__(self,
         guild_id: int,
         owner_id: int,
@@ -132,7 +152,8 @@ class Guild():
         joined_at: datetime,
         created_at: datetime,
         updated_at: datetime,
-        is_dirty: bool
+        is_dirty: bool,
+        is_deleted: bool
     ) -> None:
         self.guild_id = guild_id
         self.owner_id = owner_id
@@ -146,6 +167,8 @@ class Guild():
         self.created_at = created_at
         self.updated_at = updated_at
         self.is_dirty = is_dirty
+        self.is_deleted = is_deleted
+        Guild.instance_counter += 1
 
     @classmethod
     def from_dict(cls, data: dict):
@@ -161,9 +184,13 @@ class Guild():
                 welcome_channel = data["welcome_channel"],
                 joined_at = data["joined_at"],
                 created_at = data["created_at"],
-                updated_at = data["updated_at"],
-                is_dirty = data.get("is_dirty", False)
+                updated_at = data.get("updated_at", data["created_at"]),
+                is_dirty = data.get("is_dirty", False),
+                is_deleted = data.get("is_deleted", False)
             )
+
+    def compare(self, model: "Guild") -> bool:
+        return self.guild_id == model.guild_id
 
     @property
     def guild_id(self):
@@ -272,8 +299,19 @@ class Guild():
     def is_dirty(self, value: bool):
         if type(value) == bool:
             self._is_dirty = value
+    
+    @property
+    def is_deleted(self):
+        return self._is_deleted
+    
+    @is_deleted.setter
+    def is_deleted(self, value: bool):
+        if type(value) == bool:
+            self._is_deleted = value
 
 class UserGuildSettings():
+    instance_counter = 0
+
     def __init__(self,
         user_id: int,
         guild_id: int,
@@ -286,7 +324,8 @@ class UserGuildSettings():
         created_at: datetime,
         updated_at: datetime,
         is_member: bool,
-        is_dirty: bool
+        is_dirty: bool,
+        is_deleted: bool
     ) -> None:
         self.user_id = user_id
         self.guild_id = guild_id
@@ -299,7 +338,9 @@ class UserGuildSettings():
         self.created_at = created_at
         self.updated_at = updated_at
         self.is_member = is_member
-        self.is_dirty = is_dirty
+        self.is_dirty = is_dirty,
+        self.is_deleted = is_deleted
+        UserGuildSettings.instance_counter += 1
 
     @classmethod
     def from_dict(cls, data: dict):
@@ -314,10 +355,14 @@ class UserGuildSettings():
                 custom_title = data["custom_title"],
                 last_xp_message = data["last_xp_message"],
                 created_at = data["created_at"],
-                updated_at = data["updated_at"],
+                updated_at = data.get("updated_at", data["created_at"]),
                 is_member = data["is_member"],
-                is_dirty = data.get("is_dirty", False)
+                is_dirty = data.get("is_dirty", False),
+                is_deleted = data.get("is_deleted", False)
             )
+
+    def compare(self, model: "UserGuildSettings") -> bool:
+        return self.user_id == model.user_id and self.guild_id == model.guild_id
 
     @property
     def user_id(self):
@@ -426,8 +471,19 @@ class UserGuildSettings():
     def is_dirty(self, value: bool):
         if type(value) == bool:
             self._is_dirty = value
+    
+    @property
+    def is_deleted(self):
+        return self._is_deleted
+    
+    @is_deleted.setter
+    def is_deleted(self, value: bool):
+        if type(value) == bool:
+            self._is_deleted = value
 
 class ModerationLog():
+    instance_counter = 0
+
     def __init__(self,
         mlog_id: int,
         guild_id: int,
@@ -439,7 +495,8 @@ class ModerationLog():
         duration_minutes: int,
         is_active: bool,
         pardoned: bool,
-        is_dirty: bool
+        is_dirty: bool,
+        is_deleted: bool
     ) -> None:
         self.mlog_id = mlog_id
         self.guild_id = guild_id
@@ -452,6 +509,8 @@ class ModerationLog():
         self.is_active = is_active
         self.pardoned = pardoned
         self.is_dirty = is_dirty
+        self.is_deleted = is_deleted
+        ModerationLog.instance_counter += 1
 
     @classmethod
     def from_dict(cls, data: dict):
@@ -467,8 +526,12 @@ class ModerationLog():
                 duration_minutes = data["duration_minutes"],
                 is_active = data["is_active"],
                 pardoned = data["pardoned"],
-                is_dirty = data.get("is_dirty", False)
+                is_dirty = data.get("is_dirty", False),
+                is_deleted = data.get("is_deleted", False)
             )
+
+    def compare(self, model: "ModerationLog") -> bool:
+        return self.mlog_id == model.mlog_id
 
     @property
     def mlog_id(self):
@@ -477,6 +540,8 @@ class ModerationLog():
     @mlog_id.setter
     def mlog_id(self, value):
         if type(value) == int:
+            if value == -1:
+                value = ModerationLog.instance_counter
             self._mlog_id = value
 
     @property
@@ -568,3 +633,12 @@ class ModerationLog():
     def is_dirty(self, value: bool):
         if type(value) == bool:
             self._is_dirty = value
+    
+    @property
+    def is_deleted(self):
+        return self._is_deleted
+    
+    @is_deleted.setter
+    def is_deleted(self, value: bool):
+        if type(value) == bool:
+            self._is_deleted = value

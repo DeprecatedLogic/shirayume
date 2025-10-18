@@ -1,11 +1,12 @@
 import os
 import dotenv
-from cogs import moderation, economy, polls, rankings, utilities_commands, web_scraping_commands
 from database import database_manager
+from cogs import moderation, economy, polls, rankings, utilities_commands, web_scraping_commands
 import discord
 from discord.ext import commands
 import json
 import asyncio
+from utils import shared, helpers
 
 bot = commands.Bot("EXE>", intents = discord.Intents.all())
 
@@ -22,6 +23,9 @@ async def on_ready():
         print(f"Failed to sync commands: {e}")
 
 def launch():
+    with open("config.json", "r") as config_file:
+        config = json.load(config_file)
+    
     if not dotenv.load_dotenv(dotenv_path = dotenv.find_dotenv(filename = ".env")):
         print("[ERROR] No environment variables set...")
         exit()
@@ -33,20 +37,20 @@ def launch():
     DISCORD_TOKEN = os.environ["DISCORD_TOKEN"]
 
     # Debugging output
-    print(
-        f"DB Host: {DB_HOST}",
-        f"DB User: {DB_USER}",
-        f"DB Password: {DB_PASSWORD}",
-        f"Database: {DATABASE}",
-        f"Token: {DISCORD_TOKEN}",
-        sep="\n"
+    helpers.custom_print(
+        level = shared.LogLevel.DEBUG,
+        function_name = "launch",
+        description = f"""
+        DB Host: {DB_HOST}
+        DB User: {DB_USER}
+        DB Password: {DB_PASSWORD}
+        Database: {DATABASE}
+        Token: {DISCORD_TOKEN}
+
+        """
     )
-
-    #asyncio.run(database_manager.setup())
-
-    with open("config.json", "r") as config_file:
-        config = json.load(config_file)
-
+    
+    database_manager.setup(DB_HOST, DB_USER, DB_PASSWORD, DATABASE)
     asyncio.run(moderation.setup(bot))
     #asyncio.run(economy.setup(bot, config))
     #asyncio.run(polls.setup(bot, config))

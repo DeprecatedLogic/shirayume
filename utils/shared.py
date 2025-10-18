@@ -20,6 +20,10 @@ class LogLevel(Enum):
     def color_rgb(self) -> tuple[int, int, int]:
         """ Returns the (R, G, B) tuple. """
         return self.value[1]
+    
+    @classmethod
+    def max_length(cls) -> int:
+        return len(max(cls._member_names_))
 
     def __str__(self):
         """ Returns the uppercase name (e.g., 'DEBUG') when converted to string. """
@@ -33,10 +37,10 @@ class LogLevel(Enum):
 
 class Table(Enum):
     """ Defines database tables. """
-    user = auto()
-    guild = auto()
+    users = auto()
+    guilds = auto()
     user_guild_settings = auto()
-    moderation_log = auto()
+    moderation_logs = auto()
 
 class Action(Enum):
     """ Defines actions that the discord bot can take. """
