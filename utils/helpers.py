@@ -1,7 +1,7 @@
 import discord
 from datetime import datetime
 import asyncio
-import shared
+from utils import shared
 
 def embed_generator(title: str, description:str, color: tuple[int, int, int] = (255,255,255)) -> discord.Embed:
     r,g,b = color

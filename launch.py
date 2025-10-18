@@ -5,6 +5,21 @@ from database import database_manager
 import discord
 from discord.ext import commands
 import json
+import asyncio
+
+bot = commands.Bot("EXE>", intents = discord.Intents.all())
+
+@bot.event
+async def on_ready():
+    print(f"Logged in as {bot.user} (ID: {bot.user.id})")
+    print("Syncing commands...")
+    try:
+        GUILD_ID = 1183463468020531343
+        synced = await bot.tree.sync(guild=discord.Object(id=GUILD_ID))
+        print(f"Synced {len(synced)} commands to guild {GUILD_ID}")
+        print(f"Synced {len(synced)} commands globally.")
+    except Exception as e:
+        print(f"Failed to sync commands: {e}")
 
 def launch():
     if not dotenv.load_dotenv(dotenv_path = dotenv.find_dotenv(filename = ".env")):
@@ -15,7 +30,7 @@ def launch():
     DB_USER = os.environ["DB_USER"]
     DB_PASSWORD = os.environ["DB_PASSWORD"]
     DATABASE = os.environ["DATABASE"]
-    DISCORD_BOT_TOKEN = os.environ["DISCORD_BOT_TOKEN"]
+    DISCORD_TOKEN = os.environ["DISCORD_TOKEN"]
 
     # Debugging output
     print(
@@ -23,24 +38,23 @@ def launch():
         f"DB User: {DB_USER}",
         f"DB Password: {DB_PASSWORD}",
         f"Database: {DATABASE}",
-        f"Token: {DISCORD_BOT_TOKEN}"
+        f"Token: {DISCORD_TOKEN}",
+        sep="\n"
     )
 
-    bot = commands.Bot("EXE>", intents = discord.Intents.all())
-
-    #database_manager.setup()
+    #asyncio.run(database_manager.setup())
 
     with open("config.json", "r") as config_file:
         config = json.load(config_file)
 
-    moderation.setup(bot)
-    #economy.setup(bot, config)
-    #polls.setup(bot, config)
-    #rankings.setup(bot, config)
-    #utilities_commands.setup(bot, config)
-    #web_scraping_commands.setup(bot, config)    
+    asyncio.run(moderation.setup(bot))
+    #asyncio.run(economy.setup(bot, config))
+    #asyncio.run(polls.setup(bot, config))
+    #asyncio.run(rankings.setup(bot, config))
+    #asyncio.run(utilities_commands.setup(bot, config))
+    #asyncio.run(web_scraping_commands.setup(bot, config)    )
 
-    bot.run(DISCORD_BOT_TOKEN, reconnect = True)
+    bot.run(DISCORD_TOKEN, reconnect = True)
 
 if __name__ == "__main__":
     launch()
