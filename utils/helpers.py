@@ -36,7 +36,7 @@ def custom_print(
     description_color = terminal.color_rgb(r, g, b)
 
     print(
-        f"{level} ",
+        f"{description_color}{level}{' ' * (shared.LogLevel.max_length() - len(level.name))}",
         f"{datetime_fg}{datetime.strftime(datetime.now(), '[%d-%m-%Y %H:%M:%S]')}",
         f"{function_fg}[{function_name}]",
         f"{description_color}{description}",
