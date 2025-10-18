@@ -1,0 +1,1 @@
+-- Default values to insert into the database (testing purposes?)

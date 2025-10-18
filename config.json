@@ -1,0 +1,26 @@
+{
+  "bot_prefix": "EXE>",
+  "official_guild_id": 1183463468020531343,
+  "database": {
+    "type": "mariadb"
+  },
+  "creators": [
+    {
+      "uid": 366212855042932736,
+      "role": "owner"
+    },
+    {
+      "uid": 434774718567153665,
+      "role": "co-owner"
+    },
+    {
+      "uid": 528368895300730882,
+      "role": "co-owner"
+    }
+  ],
+  "features": {
+    "economy_enabled": ["currency", ""],
+    "ranks_enabled": ["levels", "titles", "achievements"],
+    "minigames_enabled": ["dice", "coinflip"]
+  }
+}
