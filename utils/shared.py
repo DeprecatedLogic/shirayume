@@ -41,6 +41,7 @@ class Table(Enum):
     guilds = auto()
     user_guild_settings = auto()
     moderation_logs = auto()
+    polls = auto()
 
 class Action(Enum):
     """ Defines actions that the discord bot can take. """

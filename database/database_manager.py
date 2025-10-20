@@ -1,4 +1,5 @@
 import os
+import json
 import mysql.connector
 import mysql.connector.cursor_cext
 from typing import Union, List, Dict
@@ -15,6 +16,7 @@ class DatabaseManager():
         self.users: List[models.User] = []
         self.user_guild_settings: List[models.UserGuildSettings] = []
         self.moderation_logs: List[models.ModerationLog] = []
+        self.polls: List[models.Poll] = []
 
         try:
             self.db_connection = mysql.connector.connect(
@@ -146,6 +148,24 @@ class DatabaseManager():
                 mlog.is_dirty = True
                 mlog.is_deleted = True
 
+    def add_polls(self, polls: Union[List[models.Poll], models.Poll]) -> None:
+        if isinstance(polls, models.Poll):
+            polls = [polls]
+        for poll in polls:
+            if poll not in self.polls:
+                poll.is_dirty = True
+                poll.is_deleted = False
+                self.polls.append(poll)
+
+    def remove_polls(self, poll_ids: Union[List[int], int]) -> None:
+        if isinstance(poll_ids, int):
+            poll_ids = [poll_ids]
+        for poll_id in poll_ids:
+            poll = next((p for p in self.polls if p.poll_id == poll_id), None)
+            if poll:
+                poll.is_dirty = True
+                poll.is_deleted = True
+
     def initialize_database_model(self, table: shared.Table, **kwargs) -> Union[models.User, models.Guild, models.UserGuildSettings, models.ModerationLog, None]:
         try:
             if table == shared.Table.users:
@@ -201,6 +221,19 @@ class DatabaseManager():
                     "pardoned"
                 ]):
                     return models.ModerationLog.from_dict(kwargs)
+            elif table == shared.Table.polls:
+                if all(k in kwargs for k in [
+                    "poll_id",
+                    "guild_id",
+                    "creator_id",
+                    "question",
+                    "options",
+                    "votes",
+                    "is_active",
+                    "created_at",
+                    "updated_at"
+                ]):
+                    return models.Poll.from_dict(kwargs)
             helpers.custom_print(
                 level = shared.LogLevel.ERROR,
                 function_name = "initialize_database_model",
@@ -310,6 +343,25 @@ class DatabaseManager():
                             mlog.action_timestamp, mlog.duration_minutes, mlog.is_active, mlog.pardoned,
                             mlog.guild_id, mlog.user_id, mlog.moderator_id, mlog.action_type.name, mlog.reason,
                             mlog.action_timestamp, mlog.duration_minutes, mlog.is_active, mlog.pardoned
+                        )
+                    )
+
+            for poll in [p for p in self.polls if p.is_dirty]:
+                if poll.is_deleted:
+                    self.db_shirayume.execute("DELETE FROM polls WHERE poll_id=%s", (poll.poll_id,))
+                else:
+                    self.db_shirayume.execute(
+                        """
+                        INSERT INTO polls (poll_id, guild_id, creator_id, question, options, votes, is_active, created_at, updated_at)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        ON DUPLICATE KEY UPDATE
+                        guild_id=%s, creator_id=%s, question=%s, options=%s, votes=%s, is_active=%s, updated_at=%s
+                        """,
+                        (
+                            poll.poll_id, poll.guild_id, poll.creator_id, poll.question, json.dumps(poll.options),
+                            json.dumps(poll.votes), poll.is_active, poll.created_at, poll.updated_at,
+                            poll.guild_id, poll.creator_id, poll.question, json.dumps(poll.options),
+                            json.dumps(poll.votes), poll.is_active, poll.updated_at
                         )
                     )
 
@@ -429,6 +481,26 @@ def setup(DB_HOST, DB_USER, DB_PASSWORD, DATABASE):
             level = shared.LogLevel.DEBUG,
             function_name = "database_manager.setup",
             description = f"DB moderation logs imported"
+        )
+
+        helpers.custom_print(
+            level = shared.LogLevel.DEBUG,
+            function_name = "database_manager.setup",
+            description = f"Importing polls from DB..."
+        )
+        DB_MANAGER.db_shirayume.execute(f"SELECT * FROM {shared.Table.polls.name}")
+        polls = []
+        while True:
+            poll = DB_MANAGER.db_shirayume.fetchone()
+            if not poll:
+                break
+            model = DB_MANAGER.initialize_database_model(shared.Table.polls, **poll)
+            moderation_logs.append(model)
+        DB_MANAGER.add_polls(polls)
+        helpers.custom_print(
+            level = shared.LogLevel.DEBUG,
+            function_name = "database_manager.setup",
+            description = f"DB polls imported"
         )
 
         helpers.custom_print(
