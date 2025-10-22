@@ -63,6 +63,24 @@ class CoinFlip(Enum):
     heads = auto()
     tails = auto()
 
+class NumberGame:
+    def __init__(self, number_to_guess: int, attempts: int):
+        self.number = number_to_guess
+        self.attempts_left = attempts
+
+    def guess(self, value: int) -> str:
+        self.attempts_left -= 1
+
+        if value == self.number:
+            return "correct"
+        elif value < self.number:
+            return "higher"
+        else:
+            return "lower"
+
+    def out_of_attempts(self) -> bool:
+        return self.attempts_left <= 0
+
 class Rank(Enum):
     """ Defines all available rank titles. """
     rank_0 = ""
