@@ -62,7 +62,8 @@ Shirayume.exe is organized for clarity and modularity:
 The bot ties together via `launch.py`, which loads cogs, connects to Discord, and uses services and the database for seamless operation.
 
 ## Author Notes
-Fueled by late-night catpuccino. - [ItzKarizma](https://github.com/ItzKarizma)
+Fueled by late-night catpuccino. - [ItzKarizma](https://github.com/ItzKarizma)  
+Megumin is a synonym of peak. - [EgoChaxs](https://github.com/EgoChaxs)
 
 ## License
 Licensed under a custom MIT license for personal and educational use only. No commercial shenanigans allowed, keep it chill and code for fun!
