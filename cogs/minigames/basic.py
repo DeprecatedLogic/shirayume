@@ -2,13 +2,142 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 import asyncio
+from collections import defaultdict
 from random import randint, choice
 from utils import shared, helpers
-
+from NumberGuessingLogic import NumberGame
 
 class Minigames(commands.Cog):
+    class GuessModal(discord.ui.Modal, title = "Enter your guess"):
+        guess = discord.ui.TextInput(
+            label = "Your guess",
+            placeholder = "Type a number and submit",
+            required = True,
+            max_length = 10
+        )
+
+        def __init__(self, game: "Minigames.NumberGame", view: "Minigames.GuessView"):
+            super().__init__()
+            self.game = game
+            self.view = view
+
+        async def on_submit(self, interaction: discord.Interaction) -> None:
+            await interaction.response.defer(ephemeral = True)
+
+            try:
+                guess_val = int(self.guess.value.strip())
+            except ValueError:
+                await interaction.followup.send("Please enter a valid integer.", ephemeral = True)
+                return
+            
+            if not (self.game.from_number <= guess_val <= self.game.to_number):
+                await interaction.followup.send(
+                    f"Guess must be between {self.game.from_number} and {self.game.to_number}.",
+                    ephemeral = True
+                )
+                return
+
+            await self.view.process_guess_via_modal(interaction, guess_val)
+    
+    class GuessView(discord.ui.View):
+        def __init__(self, game: "Minigames.NumberGame", cog: "Minigames", *, timeout: float = 60.0):
+            super().__init__(timeout = timeout)
+            self.game = game
+            self.cog = cog
+            self.message: discord.Message | None = None
+
+        @discord.ui.button(label = "Guess", style = discord.ButtonStyle.primary)
+        async def open_modal_button(self, button: discord.ui.Button, interaction: discord.Interaction):
+            if interaction.user.id != self.game.user_id:
+                return await interaction.response.send_message("This is not your game.", ephemeral = True)
+
+            modal = Minigames.GuessModal(self.game, self)
+            await interaction.response.send_modal(modal)
+
+        @discord.ui.button(label = "End game", style = discord.ButtonStyle.danger)
+        async def end_game_button(self, button: discord.ui.Button, interaction: discord.Interaction):
+            if interaction.user.id != self.game.user_id:
+                return await interaction.response.send_message("This is not your game.", ephemeral = True)
+
+            await self._end_game(interaction, ended_by_user = True)
+
+        async def process_guess_via_modal(self, interaction: discord.Interaction, guess_val: int):
+            result = self.game.make_guess(guess_val)
+
+            if result == "win":
+                embed = helpers.embed_generator(
+                    title = "Guess the number",
+                    description = f"🎉 Congrats {interaction.user.mention}! You guessed the number: **{self.game.answer}**.\n\n{self.game.summary()}",
+                    colour = (0, 191, 255)
+                )
+
+                if self.message:
+                    await self.message.edit(embed = embed, view = None)
+                await interaction.followup.send("You won! 🎉", ephemeral = True)
+                self.cog.remove_game("guess", self.game.user_id)
+                return
+
+            if result == "bigger":
+                hint = "⬆️ The number is bigger than your guess."
+            else:
+                hint = "⬇️ The number is smaller than your guess."
+
+            if self.game.out_of_attempts():
+                embed = helpers.embed_generator(
+                    title = "Guess the number",
+                    description = f"❌ Game over, no attempts left. The number was **{self.game.answer}**.\n\n{self.game.summary()}",
+                    colour = (0, 191, 255)
+                )
+                if self.message:
+                    await self.message.edit(embed = embed, view = None)
+                await interaction.followup.send("Out of attempts — game has concluded.", ephemeral = True)
+                self.cog.remove_game("guess", self.game.user_id)
+                return
+
+            embed = helpers.embed_generator(
+                title = "Guess the number",
+                description = f"{hint}\n\n{self.game.summary()}",
+                colour = (0, 191, 255)
+            )
+            if self.message:
+                await self.message.edit(embed = embed, view = self)
+
+        async def _end_game(self, interaction: discord.Interaction, ended_by_user: bool = False):
+            embed = helpers.embed_generator(
+                title = "Guess the number",
+                description = f"⛔ Game forcefully ended by player." if ended_by_user else "Game concluded due to timeout.",
+                colour = (0, 191, 255)
+            )
+            if self.message:
+                await self.message.edit(embed = embed, view = None)
+            if ended_by_user:
+                await interaction.response.send_message("Number guessing game ended.", ephemeral = True)
+            self.cog.remove_game("guess", self.game.user_id)
+
+        async def on_timeout(self):
+            embed = helpers.embed_generator(
+                title = "Guess the number",
+                description = f"⌛ {self.game.user_id}, game timed out.",
+                colour = (0, 191, 255)
+            )
+            try:
+                if self.message:
+                    await self.message.edit(embed = embed, view = None)
+            except Exception:
+                pass
+            self.cog.remove_game("guess", self.game.user_id)
+
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+        self.active_games: dict[str, dict[int, Minigames.NumberGame]] = defaultdict(dict)
+
+    def remove_game(self, game_name: str, user_id: int):
+        if user_id in self.active_games.get(game_name, {}):
+            try:
+                del self.active_games[game_name][user_id]
+            except KeyError:
+                pass
+
 
     @app_commands.command(name = "coinflip", description = "Flip a coin!")
     async def coin_flip(self, interaction: discord.Interaction):
@@ -48,92 +177,32 @@ class Minigames(commands.Cog):
 
     @app_commands.command(name = "guess_the_number", description = "Guess the number!")
     async def guess_the_number(self, interaction: discord.Interaction, from_number: int = 0, to_number: int = 100, attempts: int = 10):
-        number_to_guess = randint(from_number, to_number)
-        max_attempts = attempts
+        if from_number >= to_number:
+            return await interaction.response.send_message("`from_number` must be less than `to_number`.", ephemeral = True)
+        if attempts < 1:
+            return await interaction.response.send_message("Attempts must be >= 1.", ephemeral = True)
+
+        user_id = interaction.user.id
+
+        if user_id in self.active_games["guess"]:
+            return await interaction.response.send_message("You already have a Guess game running. Finish or end it first.", ephemeral = True)
         
-        def is_correct_player_and_format(m):
-            if m.author != interaction.user or m.channel != interaction.channel:
-                return False
-                
-            if m.content.startswith('!'):
-                guess_str = m.content[1:].strip()
-                return guess_str.isdigit() and from_number <= int(guess_str) <= to_number
-                
-            return False
-        
+        game = Minigames.NumberGame(user_id, from_number, to_number, attempts)
+        view = Minigames.GuessView(game, self, timeout = 60.0)
+
+        self.active_games["guess"][user_id] = game
+
         initial_embed = helpers.embed_generator(
-                        title = "Number guessing",
-                        description = f"Guess the secret number between {from_number} and {to_number}! You have {attempts} attempts!",
-                        color = (0, 191, 255)
-                    )
-        
-        await interaction.response.send_message(embed = initial_embed)
+            title = "Guess The Number",
+            description = f"Guess a number between **{from_number}** and **{to_number}**.\nAttempts: **{attempts}**\n\nClick **Guess** to open the input modal.",
+            colour = (0, 191, 255)
+        )
 
-        game_message = await interaction.original_response()
-        
-        while max_attempts > 0:
-            try:
-                guess_message = await self.bot.wait_for(
-                    'message',
-                    check = is_correct_player_and_format,
-                    timeout = 60.0
-                )
-                guess_number = int(guess_message.content[1:].strip()) 
-                max_attempts -= 1
+        modal = Minigames.GuessModal(game, view)
+        await interaction.response.send_modal(modal)
 
-                if guess_number == number_to_guess:
-                    win_embed = helpers.embed_generator(
-                        title = "Number guessing",
-                        description = f"🎉 Congrats {interaction.user.name} on guessing the secret number ({number_to_guess})!",
-                        color = (0, 191, 255)
-                    )
-                    await interaction.followup.send(embed = win_embed)
-                    return
-
-                else:
-                    if guess_number < number_to_guess:
-                        description_text = f"The number to guess is **bigger** than {guess_number}! You have {max_attempts} attempts remaining!" 
-                    else:
-                        description_text = f"The number to guess is **smaller** than {guess_number}! You have {max_attempts} attempts remaining!" 
-
-                    situation_embed = helpers.embed_generator(
-                        title = f"Number guessing",
-                        description = description_text,
-                        color = (0, 191, 255)
-                        )
-                    
-                    await game_message.edit(embed = situation_embed)
-                    
-            except asyncio.TimeoutError:
-                embed = helpers.embed_generator(
-                    title = "Number guessing",
-                    description = f"😴 Game timed out! Do not leave me hanging {interaction.user.name}",
-                )
-                await interaction.followup.send(embed=embed)
-                return
-            
-            except Exception as e:
-                embed = helpers.embed_generator(
-                    title = "Number guessing",
-                    description = f"[ERROR] I am not getting paid enough for this... Error {e}",
-                )
-                await interaction.followup.send(embed = embed, ephemeral=True)
-
-        if max_attempts <= 0:
-            try:
-                lose_embed = helpers.embed_generator(
-                    title = "Number guessing",
-                    description = f"❌ Game Over {interaction.user.name}! You ran out of attempts. The secret number was **{number_to_guess}**.",
-                    color = (0, 191, 255)
-                )
-                await interaction.followup.send(embed = lose_embed)
-                
-            except Exception as e:
-                embed = helpers.embed_generator(
-                    title = "Number guessing",
-                    description = f"[ERROR] I am not getting paid enough for this... Error: {e}",
-                )
-                await interaction.followup.send(embed = embed, ephemeral=True)
+        sent = await interaction.followup.send(embed = initial_embed, view = view, ephemeral = False)
+        view.message = sent
 
 
     def rock_paper_scissors(first_pick: shared.RPS, second_pick: shared.RPS):
