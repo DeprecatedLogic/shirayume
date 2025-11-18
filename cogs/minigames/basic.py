@@ -16,7 +16,7 @@ class Minigames(commands.Cog):
             max_length = 10
         )
 
-        def __init__(self, game: "Minigames.NumberGame", view: "Minigames.GuessView"):
+        def __init__(self, game: NumberGame, view: "Minigames.GuessView"):
             super().__init__()
             self.game = game
             self.view = view
@@ -157,7 +157,7 @@ class Minigames(commands.Cog):
             await interaction.response.send_message(embed = embed, ephemeral=True)
 
 
-    @app_commands.command(name = "roll_dice", description = "Roll a custom sized dice!")
+    @app_commands.command(name = "rolldice", description = "Roll a custom sized dice!")
     async def roll_dice(self, interaction: discord.Interaction, sides: int = 6):
         try:   
             embed = helpers.embed_generator(
@@ -175,7 +175,7 @@ class Minigames(commands.Cog):
             await interaction.response.send_message(embed = embed, ephemeral=True)
 
 
-    @app_commands.command(name = "guess_the_number", description = "Guess the number!")
+    @app_commands.command(name = "guessnumber", description = "Guess the number!")
     async def guess_the_number(self, interaction: discord.Interaction, from_number: int = 0, to_number: int = 100, attempts: int = 10):
         if from_number >= to_number:
             return await interaction.response.send_message("`from_number` must be less than `to_number`.", ephemeral = True)
