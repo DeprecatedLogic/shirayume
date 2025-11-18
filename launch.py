@@ -1,7 +1,7 @@
 import os
 import dotenv
 from database import database_manager
-from cogs import moderation, economy, polls, rankings, utilities_commands, web_scraping_commands
+from cogs import moderation, economy, poll_commands, rankings, utilities_commands, web_scraping_commands
 import discord
 from discord.ext import commands
 import json
@@ -53,7 +53,7 @@ def launch():
     database_manager.setup(DB_HOST, DB_USER, DB_PASSWORD, DATABASE)
     asyncio.run(moderation.setup(bot))
     #asyncio.run(economy.setup(bot, config))
-    #asyncio.run(polls.setup(bot, config))
+    #asyncio.run(poll_commands.setup(bot, config))
     #asyncio.run(rankings.setup(bot, config))
     #asyncio.run(utilities_commands.setup(bot, config))
     #asyncio.run(web_scraping_commands.setup(bot, config)    )

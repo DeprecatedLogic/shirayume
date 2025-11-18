@@ -11,62 +11,62 @@ USE shirayume_db;
 
 -- Initialize all the necessary tables
 CREATE TABLE users (
-    user_id BIGINT primary key,
-    username VARCHAR(255) not null,
-    discriminator VARCHAR(4) null,
-    avatar_url VARCHAR(2048) null,
-    is_bot BOOLEAN DEFAULT false not null,
-    currency BIGINT DEFAULT 0 not null,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP() not null,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP() not null
+    user_id BIGINT PRIMARY KEY,
+    username VARCHAR(255) NOT NULL,
+    discriminator VARCHAR(4) NULL,
+    avatar_url VARCHAR(2048) NULL,
+    is_bot BOOLEAN DEFAULT FALSE NOT NULL,
+    currency BIGINT DEFAULT 0 NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP() NOT NULL,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP()
         ON UPDATE CURRENT_TIMESTAMP()
-        not null
+        NOT NULL
 );
 
 CREATE TABLE guilds (
-    guild_id BIGINT primary key,
-    owner_id BIGINT not null,
-    name VARCHAR(255) not null,
-    icon_url VARCHAR(2048) null,
-    member_count INT not null,
-    bot_count INT not null,
-    is_available BOOLEAN not null,
-    welcome_channel BIGINT null,
-    joined_at DATETIME DEFAULT CURRENT_TIMESTAMP() not null,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP() not null,
+    guild_id BIGINT PRIMARY KEY,
+    owner_id BIGINT NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    icon_url VARCHAR(2048) NULL,
+    member_count INT NOT NULL,
+    bot_count INT NOT NULL,
+    is_available BOOLEAN NOT NULL,
+    welcome_channel BIGINT NULL,
+    joined_at DATETIME DEFAULT CURRENT_TIMESTAMP() NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP() NOT NULL,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP()
         ON UPDATE CURRENT_TIMESTAMP()
-        not null,
-    constraint fk_guilds_userid_users_userid
-        foreign key (owner_id) references users(user_id)
+        NOT NULL,
+    CONSTRAINT fk_guilds_userid_users_userid
+        FOREIGN KEY (owner_id) REFERENCES users(user_id)
 );
 
 CREATE TABLE user_guild_settings (
-    user_id BIGINT not null,
-    guild_id BIGINT not null,
-    last_interaction DATETIME DEFAULT CURRENT_TIMESTAMP() not null,
-    experience BIGINT DEFAULT 0 not null,
-    level INT DEFAULT 0 not null,
-    custom_title VARCHAR(255) null,
-    last_xp_message_at DATETIME null,
-    is_member BOOLEAN DEFAULT true not null,
-    joined_at DATETIME DEFAULT CURRENT_TIMESTAMP() not null,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP() not null,
+    user_id BIGINT NOT NULL,
+    guild_id BIGINT NOT NULL,
+    last_interaction DATETIME DEFAULT CURRENT_TIMESTAMP() NOT NULL,
+    experience BIGINT DEFAULT 0 NOT NULL,
+    level INT DEFAULT 0 NOT NULL,
+    custom_title VARCHAR(255) NULL,
+    last_xp_message_at DATETIME NULL,
+    is_member BOOLEAN DEFAULT TRUE NOT NULL,
+    joined_at DATETIME DEFAULT CURRENT_TIMESTAMP() NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP() NOT NULL,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP()
         ON UPDATE CURRENT_TIMESTAMP()
-        not null,
-    primary key (user_id, guild_id),
-    constraint fk_user_guild_settings_userid_users_userid
-        foreign key (user_id) references users(user_id),
-    constraint fk_user_guild_settings_guildid_guilds_guildid
-        foreign key (guild_id) references guilds(guild_id)
+        NOT NULL,
+    PRIMARY KEY (user_id, guild_id),
+    CONSTRAINT fk_user_guild_settings_userid_users_userid
+        FOREIGN KEY (user_id) REFERENCES users(user_id),
+    CONSTRAINT fk_user_guild_settings_guildid_guilds_guildid
+        FOREIGN KEY (guild_id) REFERENCES guilds(guild_id)
 );
 
 CREATE TABLE moderation_logs (
-    mlog_id BIGINT primary key,
-    guild_id BIGINT not null,
-    user_id BIGINT not null,
-    moderator_id BIGINT not null,
+    mlog_id BIGINT PRIMARY KEY,
+    guild_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    moderator_id BIGINT NOT NULL,
     action_type ENUM(
         'warn',
         'mute',
@@ -74,16 +74,34 @@ CREATE TABLE moderation_logs (
         'ban',
         'unmute',
         'unban'
-    ) DEFAULT 'warn' not null,
-    reason TEXT null,
-    action_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP() not null,
-    duration_minutes INT null,
-    is_active BOOLEAN DEFAULT true,
-    pardoned BOOLEAN DEFAULT false,
-    constraint fk_moderation_logs_guildid_guilds_guildid
-        foreign key (guild_id) references guilds(guild_id),
-    constraint fk_moderation_logs_userid_users_userid
-        foreign key (user_id) references users(user_id),
-    constraint fk_moderation_logs_moderatorid_users_userid
-        foreign key (moderator_id) references users(user_id)
+    ) DEFAULT 'warn' NOT NULL,
+    reason TEXT NULL,
+    action_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP() NOT NULL,
+    duration_minutes INT NULL,
+    is_active BOOLEAN DEFAULT TRUE,
+    pardoned BOOLEAN DEFAULT FALSE,
+    CONSTRAINT fk_moderation_logs_guildid_guilds_guildid
+        FOREIGN KEY (guild_id) REFERENCES guilds(guild_id),
+    CONSTRAINT fk_moderation_logs_userid_users_userid
+        FOREIGN KEY (user_id) REFERENCES users(user_id),
+    CONSTRAINT fk_moderation_logs_moderatorid_users_userid
+        FOREIGN KEY (moderator_id) REFERENCES users(user_id)
+);
+
+CREATE TABLE polls (
+    poll_id BIGINT PRIMARY KEY,
+    guild_id BIGINT NOT NULL,
+    creator_id BIGINT NOT NULL,
+    question VARCHAR(255) NOT NULL,
+    options JSON NOT NULL,
+    votes JSON NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP() NOT NULL,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP()
+        ON UPDATE CURRENT_TIMESTAMP()
+        NOT NULL,
+    CONSTRAINT fk_polls_guildid_guilds_guildid
+        FOREIGN KEY (guild_id) REFERENCES guilds(guild_id),
+    CONSTRAINT fk_polls_creatorid_users_userid
+        FOREIGN KEY (creator_id) REFERENCES users(user_id)
 );

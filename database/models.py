@@ -1,3 +1,4 @@
+from typing import List, Dict
 from datetime import datetime
 from utils.shared import Action
 
@@ -624,6 +625,154 @@ class ModerationLog():
     def pardoned(self, value: bool):
         if type(value) == bool:
             self._pardoned = value
+
+    @property
+    def is_dirty(self):
+        return self._is_dirty
+    
+    @is_dirty.setter
+    def is_dirty(self, value: bool):
+        if type(value) == bool:
+            self._is_dirty = value
+    
+    @property
+    def is_deleted(self):
+        return self._is_deleted
+    
+    @is_deleted.setter
+    def is_deleted(self, value: bool):
+        if type(value) == bool:
+            self._is_deleted = value
+
+class Poll():
+    instance_counter = 0
+
+    def __init__(self,
+        poll_id: int,
+        guild_id: int,
+        creator_id: int,
+        question: str,
+        options: List,
+        votes: Dict[str, int],
+        is_active: bool,
+        created_at: datetime,
+        updated_at: datetime,
+        is_dirty: bool,
+        is_deleted: bool
+    ) -> None:
+        self.poll_id = poll_id
+        self.guild_id = guild_id
+        self.creator_id = creator_id
+        self.question = question
+        self.options = options
+        self.votes = votes
+        self.is_active = is_active
+        self.created_at = created_at
+        self.updated_at = updated_at
+        self.is_dirty = is_dirty,
+        self.is_deleted = is_deleted
+        Poll.instance_counter += 1
+
+    @classmethod
+    def from_dict(cls, data: Dict):
+        if type(data) is dict:
+            return cls(
+                poll_id = data["poll_id"],
+                guild_id = data["guild_id"],
+                creator_id = data["creator_id"],
+                question = data["question"],
+                options = data["options"],
+                votes = data["votes"],
+                is_active = data["is_active"],
+                created_at = data["created_at"],
+                updated_at = data.get("updated_at", data["created_at"]),
+                is_dirty = data.get("is_dirty", False),
+                is_deleted = data.get("is_deleted", False)
+            )
+
+    def compare(self, model: "Poll") -> bool:
+        return self.poll_id == model.poll_id
+
+    @property
+    def poll_id(self):
+        return self._poll_id
+
+    @poll_id.setter
+    def poll_id(self, value: int):
+        if type(value) == int:
+            self._poll_id = value
+
+    @property
+    def guild_id(self):
+        return self._guild_id
+
+    @guild_id.setter
+    def guild_id(self, value: int):
+        if type(value) == int:
+            self._guild_id = value
+
+    @property
+    def creator_id(self):
+        return self._creator_id
+
+    @creator_id.setter
+    def creator_id(self, value: int):
+        if type(value) == int:
+            self._creator_id = value
+
+    @property
+    def question(self):
+        return self._question
+
+    @question.setter
+    def question(self, value: str):
+        if type(value) == str:
+            self._question = value
+
+    @property
+    def options(self):
+        return self._options
+
+    @options.setter
+    def options(self, value: List):
+        if type(value) == list:
+            self._options = value
+
+    @property
+    def votes(self):
+        return self._votes
+
+    @votes.setter
+    def votes(self, value: Dict[str, int]):
+        if type(value) == dict:
+            self._votes = value
+
+    @property
+    def is_active(self):
+        return self._is_active
+
+    @is_active.setter
+    def is_active(self, value: bool):
+        if type(value) == bool:
+            self._is_active = value
+    
+    @property
+    def created_at(self):
+        return self._created_at
+
+    @created_at.setter
+    def created_at(self, value: datetime):
+        if type(value) == datetime:
+            self._created_at = value
+
+    @property
+    def updated_at(self):
+        return self._updated_at
+
+    @updated_at.setter
+    def updated_at(self, value: datetime):
+        if type(value) == datetime:
+            self._updated_at = value
 
     @property
     def is_dirty(self):
