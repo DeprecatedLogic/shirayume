@@ -32,6 +32,7 @@ CREATE TABLE guilds (
     bot_count INT NOT NULL,
     is_available BOOLEAN NOT NULL,
     welcome_channel BIGINT NULL,
+    leave_channel BIGINT NULL,
     joined_at DATETIME DEFAULT CURRENT_TIMESTAMP() NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP() NOT NULL,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP()
@@ -93,13 +94,13 @@ CREATE TABLE polls (
     guild_id BIGINT NOT NULL,
     creator_id BIGINT NOT NULL,
     question VARCHAR(255) NOT NULL,
-    options JSON NOT NULL,
     votes JSON NOT NULL,
     is_active BOOLEAN DEFAULT TRUE,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP() NOT NULL,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP()
         ON UPDATE CURRENT_TIMESTAMP()
         NOT NULL,
+    ends_at DATETIME NULL,
     CONSTRAINT fk_polls_guildid_guilds_guildid
         FOREIGN KEY (guild_id) REFERENCES guilds(guild_id),
     CONSTRAINT fk_polls_creatorid_users_userid

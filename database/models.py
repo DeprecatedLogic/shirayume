@@ -46,7 +46,7 @@ class User():
             )
 
     def compare(self, model: "User") -> bool:
-        return self.user_id == model.user_id
+        return type(model) == User and self.user_id == model.user_id
 
     @property
     def user_id(self):
@@ -56,6 +56,8 @@ class User():
     def user_id(self, value: int):
         if type(value) == int:
             self._user_id = value
+        else:
+            raise TypeError("Incorrect type for user_id")
 
     @property
     def username(self):
@@ -65,6 +67,8 @@ class User():
     def username(self, value: str):
         if type(value) == str:
             self._username = value
+        else:
+            raise TypeError("Incorrect type for username")
 
     @property
     def discriminator(self):
@@ -74,7 +78,9 @@ class User():
     def discriminator(self, value: str):
         if type(value) == str:
             self._discriminator = value
-
+        else:
+            raise TypeError("Incorrect type for discriminator")
+                    
     @property
     def avatar_url(self):
         return self._avatar_url
@@ -83,6 +89,8 @@ class User():
     def avatar_url(self, value: str):
         if type(value) == str:
             self._avatar_url = value
+        else:
+            raise TypeError("Incorrect type for avatar_url")
 
     @property
     def is_bot(self):
@@ -92,6 +100,8 @@ class User():
     def is_bot(self, value: bool):
         if type(value) == bool:
             self._is_bot = value
+        else:
+            raise TypeError("Incorrect type for is_bot")
 
     @property
     def currency(self):
@@ -101,6 +111,8 @@ class User():
     def currency(self, value: int):
         if type(value) == int:
             self._currency = value
+        else:
+            raise TypeError("Incorrect type for currency")
 
     @property
     def created_at(self):
@@ -110,6 +122,8 @@ class User():
     def created_at(self, value: datetime):
         if type(value) == datetime:
             self._created_at = value
+        else:
+            raise TypeError("Incorrect type for created_at")
 
     @property
     def updated_at(self):
@@ -119,6 +133,8 @@ class User():
     def updated_at(self, value: datetime):
         if type(value) == datetime:
             self._updated_at = value
+        else:
+            raise TypeError("Incorrect type for updated_at")
 
     @property
     def is_dirty(self):
@@ -128,7 +144,9 @@ class User():
     def is_dirty(self, value: bool):
         if type(value) == bool:
             self._is_dirty = value
-    
+        else:
+            raise TypeError("Incorrect type for is_dirty")
+
     @property
     def is_deleted(self):
         return self._is_deleted
@@ -137,6 +155,8 @@ class User():
     def is_deleted(self, value: bool):
         if type(value) == bool:
             self._is_deleted = value
+        else:
+            raise TypeError("Incorrect type for is_deleted")
 
 class Guild():
     instance_counter = 0
@@ -150,6 +170,7 @@ class Guild():
         bot_count: int,
         is_available: bool,
         welcome_channel: int,
+        leave_channel: int,
         joined_at: datetime,
         created_at: datetime,
         updated_at: datetime,
@@ -164,6 +185,7 @@ class Guild():
         self.bot_count = bot_count
         self.is_available = is_available
         self.welcome_channel = welcome_channel
+        self.leave_channel = leave_channel
         self.joined_at = joined_at
         self.created_at = created_at
         self.updated_at = updated_at
@@ -179,10 +201,11 @@ class Guild():
                 owner_id = data["owner_id"],
                 name = data["name"],
                 icon_url = data["icon_url"],
-                member_count = data["memebr_count"],
+                member_count = data["member_count"],
                 bot_count = data["bot_count"],
                 is_available = data["is_available"],
                 welcome_channel = data["welcome_channel"],
+                leave_channel = data["leave_channel"],
                 joined_at = data["joined_at"],
                 created_at = data["created_at"],
                 updated_at = data.get("updated_at", data["created_at"]),
@@ -191,7 +214,7 @@ class Guild():
             )
 
     def compare(self, model: "Guild") -> bool:
-        return self.guild_id == model.guild_id
+        return type(model) == Guild and self.guild_id == model.guild_id
 
     @property
     def guild_id(self):
@@ -201,6 +224,8 @@ class Guild():
     def guild_id(self, value: int):
         if type(value) == int:
             self._guild_id = value
+        else:
+            raise TypeError("Incorrect type for guild_id")
 
     @property
     def owner_id(self):
@@ -210,6 +235,8 @@ class Guild():
     def owner_id(self, value: int):
         if type(value) == int:
             self._owner_id = value
+        else:
+            raise TypeError("Incorrect type for owner_id")
 
     @property
     def name(self):
@@ -219,6 +246,8 @@ class Guild():
     def name(self, value: str):
         if type(value) == str:
             self._name = value
+        else:
+            raise TypeError("Incorrect type for name")
 
     @property
     def icon_url(self):
@@ -228,6 +257,8 @@ class Guild():
     def icon_url(self, value: str):
         if type(value) == str:
             self._icon_url = value
+        else:
+            raise TypeError("Incorrect type for icon_url")
 
     @property
     def member_count(self):
@@ -237,6 +268,8 @@ class Guild():
     def member_count(self, value: int):
         if type(value) == int:
             self._member_count = value
+        else:
+            raise TypeError("Incorrect type for member_count")
 
     @property
     def bot_count(self):
@@ -246,6 +279,8 @@ class Guild():
     def bot_count(self, value: int):
         if type(value) == int:
             self._bot_count = value
+        else:
+            raise TypeError("Incorrect type for bot_count")
 
     @property
     def is_available(self):
@@ -255,6 +290,8 @@ class Guild():
     def is_available(self, value: bool):
         if type(value) == bool:
             self._is_available = value
+        else:
+            raise TypeError("Incorrect type for is_available")
 
     @property
     def welcome_channel(self):
@@ -264,6 +301,19 @@ class Guild():
     def welcome_channel(self, value: int):
         if type(value) == int:
             self._welcome_channel = value
+        else:
+            raise TypeError("Incorrect type for welcome_channel")
+        
+    @property
+    def leave_channel(self):
+        return self._leave_channel
+    
+    @leave_channel.setter
+    def leave_channel(self, value: int):
+        if type(value) == int:
+            self._leave_channel = value
+        else:
+            raise TypeError("Incorrect type for leave_channel")
 
     @property
     def joined_at(self):
@@ -273,6 +323,8 @@ class Guild():
     def joined_at(self, value: datetime):
         if type(value) == datetime:
             self._joined_at = value
+        else:
+            raise TypeError("Incorrect type for joined_at")
 
     @property
     def created_at(self):
@@ -282,6 +334,8 @@ class Guild():
     def created_at(self, value: datetime):
         if type(value) == datetime:
             self._created_at = value
+        else:
+            raise TypeError("Incorrect type for created_at")
 
     @property
     def updated_at(self):
@@ -291,6 +345,8 @@ class Guild():
     def updated_at(self, value: datetime):
         if type(value) == datetime:
             self._updated_at = value
+        else:
+            raise TypeError("Incorrect type for updated_at")
 
     @property
     def is_dirty(self):
@@ -300,7 +356,9 @@ class Guild():
     def is_dirty(self, value: bool):
         if type(value) == bool:
             self._is_dirty = value
-    
+        else:
+            raise TypeError("Incorrect type for is_dirty")
+
     @property
     def is_deleted(self):
         return self._is_deleted
@@ -309,6 +367,8 @@ class Guild():
     def is_deleted(self, value: bool):
         if type(value) == bool:
             self._is_deleted = value
+        else:
+            raise TypeError("Incorrect type for is_deleted")
 
 class UserGuildSettings():
     instance_counter = 0
@@ -339,7 +399,7 @@ class UserGuildSettings():
         self.created_at = created_at
         self.updated_at = updated_at
         self.is_member = is_member
-        self.is_dirty = is_dirty,
+        self.is_dirty = is_dirty
         self.is_deleted = is_deleted
         UserGuildSettings.instance_counter += 1
 
@@ -363,7 +423,7 @@ class UserGuildSettings():
             )
 
     def compare(self, model: "UserGuildSettings") -> bool:
-        return self.user_id == model.user_id and self.guild_id == model.guild_id
+        return type(model) == UserGuildSettings and self.user_id == model.user_id and self.guild_id == model.guild_id
 
     @property
     def user_id(self):
@@ -373,6 +433,8 @@ class UserGuildSettings():
     def user_id(self, value: int):
         if type(value) == int:
             self._user_id = value
+        else:
+            raise TypeError("Incorrect type for user_id")
 
     @property
     def guild_id(self):
@@ -382,6 +444,8 @@ class UserGuildSettings():
     def guild_id(self, value: int):
         if type(value) == int:
             self._guild_id = value
+        else:
+            raise TypeError("Incorrect type for guild_id")
 
     @property
     def joined_at(self):
@@ -391,6 +455,8 @@ class UserGuildSettings():
     def joined_at(self, value: datetime):
         if type(value) == datetime:
             self._joined_at = value
+        else:
+            raise TypeError("Incorrect type for joined_at")
 
     @property
     def last_interaction(self):
@@ -400,6 +466,8 @@ class UserGuildSettings():
     def last_interaction(self, value: datetime):
         if type(value) == datetime:
             self._last_interaction = value
+        else:
+            raise TypeError("Incorrect type for last_interaction")
 
     @property
     def experience(self):
@@ -409,6 +477,8 @@ class UserGuildSettings():
     def experience(self, value: int):
         if type(value) == int:
             self._experience = value
+        else:
+            raise TypeError("Incorrect type for experience")
 
     @property
     def level(self):
@@ -418,6 +488,8 @@ class UserGuildSettings():
     def level(self, value: int):
         if type(value) == int:
             self._level = value
+        else:
+            raise TypeError("Incorrect type for level")
 
     @property
     def custom_title(self):
@@ -427,6 +499,8 @@ class UserGuildSettings():
     def custom_title(self, value: str):
         if type(value) == str:
             self._custom_title = value
+        else:
+            raise TypeError("Incorrect type for custom_title")
 
     @property
     def last_xp_message(self):
@@ -436,6 +510,8 @@ class UserGuildSettings():
     def last_xp_message(self, value: datetime):
         if type(value) == datetime:
             self._last_xp_message = value
+        else:
+            raise TypeError("Incorrect type for last_xp_message")
 
     @property
     def created_at(self):
@@ -445,6 +521,8 @@ class UserGuildSettings():
     def created_at(self, value: datetime):
         if type(value) == datetime:
             self._created_at = value
+        else:
+            raise TypeError("Incorrect type for created_at")
 
     @property
     def updated_at(self):
@@ -454,6 +532,8 @@ class UserGuildSettings():
     def updated_at(self, value: datetime):
         if type(value) == datetime:
             self._updated_at = value
+        else:
+            raise TypeError("Incorrect type for updated_at")
 
     @property
     def is_member(self):
@@ -463,6 +543,8 @@ class UserGuildSettings():
     def is_member(self, value: bool):
         if type(value) == bool:
             self._is_member = value
+        else:
+            raise TypeError("Incorrect type for is_member")
 
     @property
     def is_dirty(self):
@@ -472,7 +554,9 @@ class UserGuildSettings():
     def is_dirty(self, value: bool):
         if type(value) == bool:
             self._is_dirty = value
-    
+        else:
+            raise TypeError("Incorrect type for is_dirty")
+
     @property
     def is_deleted(self):
         return self._is_deleted
@@ -481,6 +565,8 @@ class UserGuildSettings():
     def is_deleted(self, value: bool):
         if type(value) == bool:
             self._is_deleted = value
+        else:
+            raise TypeError("Incorrect type for is_deleted")
 
 class ModerationLog():
     instance_counter = 0
@@ -532,7 +618,7 @@ class ModerationLog():
             )
 
     def compare(self, model: "ModerationLog") -> bool:
-        return self.mlog_id == model.mlog_id
+        return type(model) == ModerationLog and self.mlog_id == model.mlog_id
 
     @property
     def mlog_id(self):
@@ -544,6 +630,8 @@ class ModerationLog():
             if value == -1:
                 value = ModerationLog.instance_counter
             self._mlog_id = value
+        else:
+            raise TypeError("Incorrect type for mlog_id")
 
     @property
     def guild_id(self):
@@ -553,6 +641,8 @@ class ModerationLog():
     def guild_id(self, value):
         if type(value) == int:
             self._guild_id = value
+        else:
+            raise TypeError("Incorrect type for guild_id")
 
     @property
     def user_id(self):
@@ -562,6 +652,8 @@ class ModerationLog():
     def user_id(self, value):
         if type(value) == int:
             self._user_id = value
+        else:
+            raise TypeError("Incorrect type for user_id")
 
     @property
     def moderator_id(self):
@@ -571,6 +663,8 @@ class ModerationLog():
     def moderator_id(self, value):
         if type(value) == int:
             self._moderator_id = value
+        else:
+            raise TypeError("Incorrect type for moderator_id")
 
     @property
     def action_type(self):
@@ -580,6 +674,8 @@ class ModerationLog():
     def action_type(self, value):
         if type(value) == Action:
             self._action_type = value
+        else:
+            raise TypeError("Incorrect type for action_type")
 
     @property
     def reason(self):
@@ -589,6 +685,8 @@ class ModerationLog():
     def reason(self, value: str):
         if type(value) == str:
             self._reason = value
+        else:
+            raise TypeError("Incorrect type for reason")
 
     @property
     def action_timestamp(self):
@@ -598,6 +696,8 @@ class ModerationLog():
     def action_timestamp(self, value: datetime):
         if type(value) == datetime:
             self._action_timestamp = value
+        else:
+            raise TypeError("Incorrect type for action_timestamp")
 
     @property
     def duration_minutes(self):
@@ -607,6 +707,8 @@ class ModerationLog():
     def duration_minutes(self, value: int):
         if type(value) == int:
             self._duration_minutes = value
+        else:
+            raise TypeError("Incorrect type for duration_minutes")
 
     @property
     def is_active(self):
@@ -616,6 +718,8 @@ class ModerationLog():
     def is_active(self, value: bool):
         if type(value) == bool:
             self._is_active = value
+        else:
+            raise TypeError("Incorrect type for is_active")
 
     @property
     def pardoned(self):
@@ -625,6 +729,8 @@ class ModerationLog():
     def pardoned(self, value: bool):
         if type(value) == bool:
             self._pardoned = value
+        else:
+            raise TypeError("Incorrect type for pardoned")
 
     @property
     def is_dirty(self):
@@ -634,7 +740,9 @@ class ModerationLog():
     def is_dirty(self, value: bool):
         if type(value) == bool:
             self._is_dirty = value
-    
+        else:
+            raise TypeError("Incorrect type for is_dirty")
+
     @property
     def is_deleted(self):
         return self._is_deleted
@@ -643,6 +751,8 @@ class ModerationLog():
     def is_deleted(self, value: bool):
         if type(value) == bool:
             self._is_deleted = value
+        else:
+            raise TypeError("Incorrect type for is_deleted")
 
 class Poll():
     instance_counter = 0
@@ -652,11 +762,11 @@ class Poll():
         guild_id: int,
         creator_id: int,
         question: str,
-        options: List,
-        votes: Dict[str, int],
+        votes: Dict[str, List[int]],
         is_active: bool,
         created_at: datetime,
         updated_at: datetime,
+        ends_at: datetime,
         is_dirty: bool,
         is_deleted: bool
     ) -> None:
@@ -664,13 +774,13 @@ class Poll():
         self.guild_id = guild_id
         self.creator_id = creator_id
         self.question = question
-        self.options = options
         self.votes = votes
         self.is_active = is_active
         self.created_at = created_at
         self.updated_at = updated_at
-        self.is_dirty = is_dirty,
+        self.is_dirty = is_dirty
         self.is_deleted = is_deleted
+        self.ends_at = ends_at
         Poll.instance_counter += 1
 
     @classmethod
@@ -681,17 +791,31 @@ class Poll():
                 guild_id = data["guild_id"],
                 creator_id = data["creator_id"],
                 question = data["question"],
-                options = data["options"],
                 votes = data["votes"],
                 is_active = data["is_active"],
                 created_at = data["created_at"],
                 updated_at = data.get("updated_at", data["created_at"]),
+                ends_at = data.get("ends_at", data["created_at"]),
                 is_dirty = data.get("is_dirty", False),
                 is_deleted = data.get("is_deleted", False)
             )
 
+    def to_dict(self) -> dict:
+        return {
+            "poll_id": self.poll_id,
+            "guild_id": self.guild_id,
+            "creator_id": self.creator_id,
+            "question": self.question,
+            "votes": self.votes,
+            "is_active": self.is_active,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+            "is_dirty": self.is_dirty,
+            "is_deleted": self.is_deleted
+        }
+
     def compare(self, model: "Poll") -> bool:
-        return self.poll_id == model.poll_id
+        return type(model) == Poll and self.poll_id == model.poll_id
 
     @property
     def poll_id(self):
@@ -700,7 +824,11 @@ class Poll():
     @poll_id.setter
     def poll_id(self, value: int):
         if type(value) == int:
+            if value == -1:
+                value = Poll.instance_counter
             self._poll_id = value
+        else:
+            raise TypeError("Incorrect type for poll_id")
 
     @property
     def guild_id(self):
@@ -710,6 +838,8 @@ class Poll():
     def guild_id(self, value: int):
         if type(value) == int:
             self._guild_id = value
+        else:
+            raise TypeError("Incorrect type for guild_id")
 
     @property
     def creator_id(self):
@@ -719,6 +849,8 @@ class Poll():
     def creator_id(self, value: int):
         if type(value) == int:
             self._creator_id = value
+        else:
+            raise TypeError("Incorrect type for creator_id")
 
     @property
     def question(self):
@@ -728,24 +860,19 @@ class Poll():
     def question(self, value: str):
         if type(value) == str:
             self._question = value
-
-    @property
-    def options(self):
-        return self._options
-
-    @options.setter
-    def options(self, value: List):
-        if type(value) == list:
-            self._options = value
+        else:
+            raise TypeError("Incorrect type for question")
 
     @property
     def votes(self):
         return self._votes
 
     @votes.setter
-    def votes(self, value: Dict[str, int]):
-        if type(value) == dict:
+    def votes(self, value: Dict[str, List[int]]):
+        if type(value) == dict and all(type(k) == str and type(v) == list for k, v in value.items()):
             self._votes = value
+        else:
+            raise TypeError("Incorrect type for votes")
 
     @property
     def is_active(self):
@@ -755,6 +882,8 @@ class Poll():
     def is_active(self, value: bool):
         if type(value) == bool:
             self._is_active = value
+        else:
+            raise TypeError("Incorrect type for is_active")
     
     @property
     def created_at(self):
@@ -764,6 +893,8 @@ class Poll():
     def created_at(self, value: datetime):
         if type(value) == datetime:
             self._created_at = value
+        else:
+            raise TypeError("Incorrect type for created_at")
 
     @property
     def updated_at(self):
@@ -773,6 +904,19 @@ class Poll():
     def updated_at(self, value: datetime):
         if type(value) == datetime:
             self._updated_at = value
+        else:
+            raise TypeError("Incorrect type for updated_at")
+
+    @property
+    def ends_at(self):
+        return self._ends_at
+    
+    @ends_at.setter
+    def ends_at(self, value: datetime):
+        if type(value) == datetime:
+            self._ends_at = value
+        else:
+            raise TypeError("Incorrect type for ends_at")
 
     @property
     def is_dirty(self):
@@ -782,6 +926,8 @@ class Poll():
     def is_dirty(self, value: bool):
         if type(value) == bool:
             self._is_dirty = value
+        else:
+            raise TypeError("Incorrect type for is_dirty")
     
     @property
     def is_deleted(self):
@@ -791,3 +937,5 @@ class Poll():
     def is_deleted(self, value: bool):
         if type(value) == bool:
             self._is_deleted = value
+        else:
+            raise TypeError("Incorrect type for is_deleted")

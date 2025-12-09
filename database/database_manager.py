@@ -30,7 +30,7 @@ class DatabaseManager():
         except mysql.connector.Error as e:
             helpers.custom_print(
                 level = shared.LogLevel.CRITICAL,
-                function_name = "DatabaseManager.__init__",
+                function_name = "database.DatabaseManager.__init__",
                 description = f"Failed to connect to the database: {e}"
             )
             raise
@@ -189,6 +189,7 @@ class DatabaseManager():
                     "bot_count",
                     "is_available",
                     "welcome_channel",
+                    "leave_channel",
                     "joined_at",
                     "created_at"
                 ]):
@@ -227,23 +228,23 @@ class DatabaseManager():
                     "guild_id",
                     "creator_id",
                     "question",
-                    "options",
                     "votes",
                     "is_active",
                     "created_at",
-                    "updated_at"
+                    "updated_at",
+                    "ends_at"
                 ]):
                     return models.Poll.from_dict(kwargs)
             helpers.custom_print(
                 level = shared.LogLevel.ERROR,
-                function_name = "initialize_database_model",
+                function_name = "database.DatabaseManager.initialize_database_model",
                 description = f"Missing required fields for {table}"
             )
             return None
         except Exception as e:
             helpers.custom_print(
                 level = shared.LogLevel.ERROR,
-                function_name = "initialize_database_model",
+                function_name = "database.DatabaseManager.initialize_database_model",
                 description = f"Error creating model for {table}: {e}"
             )
             return None
@@ -290,14 +291,14 @@ class DatabaseManager():
                 else:
                     self.db_shirayume.execute(
                         """
-                        INSERT INTO guilds (guild_id, owner_id, name, icon_url, member_count, bot_count, is_available, welcome_channel, joined_at, created_at, updated_at)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        INSERT INTO guilds (guild_id, owner_id, name, icon_url, member_count, bot_count, is_available, welcome_channel, leave_channel, joined_at, created_at, updated_at)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                         ON DUPLICATE KEY UPDATE
-                        owner_id=%s, name=%s, icon_url=%s, member_count=%s, bot_count=%s, is_available=%s, welcome_channel=%s, joined_at=%s, updated_at=%s
+                        owner_id=%s, name=%s, icon_url=%s, member_count=%s, bot_count=%s, is_available=%s, welcome_channel=%s, leave_channel=%s, joined_at=%s, updated_at=%s
                         """,
                         (
                             guild.guild_id, guild.owner_id, guild.name, guild.icon_url, guild.member_count, guild.bot_count,
-                            guild.is_available, guild.welcome_channel, guild.joined_at, guild.created_at, guild.updated_at,
+                            guild.is_available, guild.welcome_channel, guild.leave_channel, guild.joined_at, guild.created_at, guild.updated_at,
                             guild.owner_id, guild.name, guild.icon_url, guild.member_count, guild.bot_count, guild.is_available,
                             guild.welcome_channel, guild.joined_at, guild.updated_at
                         )
@@ -352,16 +353,15 @@ class DatabaseManager():
                 else:
                     self.db_shirayume.execute(
                         """
-                        INSERT INTO polls (poll_id, guild_id, creator_id, question, options, votes, is_active, created_at, updated_at)
+                        INSERT INTO polls (poll_id, guild_id, creator_id, question, votes, is_active, created_at, updated_at, ends_at)
                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                         ON DUPLICATE KEY UPDATE
-                        guild_id=%s, creator_id=%s, question=%s, options=%s, votes=%s, is_active=%s, updated_at=%s
+                        guild_id=%s, creator_id=%s, question=%s, votes=%s, is_active=%s, updated_at=%s
                         """,
                         (
-                            poll.poll_id, poll.guild_id, poll.creator_id, poll.question, json.dumps(poll.options),
-                            json.dumps(poll.votes), poll.is_active, poll.created_at, poll.updated_at,
-                            poll.guild_id, poll.creator_id, poll.question, json.dumps(poll.options),
-                            json.dumps(poll.votes), poll.is_active, poll.updated_at
+                            poll.poll_id, poll.guild_id, poll.creator_id, poll.question, json.dumps(poll.votes),
+                            poll.is_active, poll.created_at, poll.updated_at, poll.ends_at, poll.guild_id, poll.creator_id,
+                            poll.question, json.dumps(poll.votes), poll.is_active, poll.updated_at
                         )
                     )
 
@@ -370,7 +370,7 @@ class DatabaseManager():
         except mysql.connector.Error as e:
             helpers.custom_print(
                 level = shared.LogLevel.ERROR,
-                function_name = "database_commit",
+                function_name = "database.DatabaseManager.database_commit",
                 description = f"Failed to commit to database: {e}"
             )
             raise
@@ -383,7 +383,7 @@ class DatabaseManager():
         except mysql.connector.Error as e:
             helpers.custom_print(
                 level = shared.LogLevel.CRITICAL,
-                function_name = "database_close",
+                function_name = "database.DatabaseManager.database_close",
                 description = f"Failed to close database connection: {e}"
             )
             raise
@@ -391,20 +391,20 @@ class DatabaseManager():
 def setup(DB_HOST, DB_USER, DB_PASSWORD, DATABASE):
     helpers.custom_print(
         level = shared.LogLevel.INFO,
-        function_name = "database_manager.setup",
+        function_name = "database.DatabaseManager.setup",
         description = f"Starting DB setup..."
     )
     global DB_MANAGER
     DB_MANAGER = DatabaseManager(DB_HOST, DB_USER, DB_PASSWORD, DATABASE)
     helpers.custom_print(
         level = shared.LogLevel.DEBUG,
-        function_name = "database_manager.setup",
+        function_name = "database.DatabaseManager.setup",
         description = f"DB_MANAGER initialized ({DB_MANAGER})"
     )
     try:
         helpers.custom_print(
             level = shared.LogLevel.DEBUG,
-            function_name = "database_manager.setup",
+            function_name = "database.DatabaseManager.setup",
             description = f"Importing users from DB..."
         )
         DB_MANAGER.db_shirayume.execute(f"SELECT * FROM {shared.Table.users.name}")
@@ -419,13 +419,13 @@ def setup(DB_HOST, DB_USER, DB_PASSWORD, DATABASE):
         DB_MANAGER.add_users(users)
         helpers.custom_print(
             level = shared.LogLevel.DEBUG,
-            function_name = "database_manager.setup",
+            function_name = "database.DatabaseManager.setup",
             description = f"DB users imported"
         )
 
         helpers.custom_print(
             level = shared.LogLevel.DEBUG,
-            function_name = "database_manager.setup",
+            function_name = "database.DatabaseManager.setup",
             description = f"Importing guilds from DB..."
         )
         DB_MANAGER.db_shirayume.execute(f"SELECT * FROM {shared.Table.guilds.name}")
@@ -439,13 +439,13 @@ def setup(DB_HOST, DB_USER, DB_PASSWORD, DATABASE):
         DB_MANAGER.add_guilds(guilds)
         helpers.custom_print(
             level = shared.LogLevel.DEBUG,
-            function_name = "database_manager.setup",
+            function_name = "database.DatabaseManager.setup",
             description = f"DB guilds imported"
         )
 
         helpers.custom_print(
             level = shared.LogLevel.DEBUG,
-            function_name = "database_manager.setup",
+            function_name = "database.DatabaseManager.setup",
             description = f"Importing user-guild settings from DB..."
         )
         DB_MANAGER.db_shirayume.execute(f"SELECT * FROM {shared.Table.user_guild_settings.name}")
@@ -459,13 +459,13 @@ def setup(DB_HOST, DB_USER, DB_PASSWORD, DATABASE):
         DB_MANAGER.add_user_guild_settings(user_guild_settings)
         helpers.custom_print(
             level = shared.LogLevel.DEBUG,
-            function_name = "database_manager.setup",
+            function_name = "database.DatabaseManager.setup",
             description = f"DB user-guild settings imported"
         )
 
         helpers.custom_print(
             level = shared.LogLevel.DEBUG,
-            function_name = "database_manager.setup",
+            function_name = "database.DatabaseManager.setup",
             description = f"Importing moderation logs from DB..."
         )
         DB_MANAGER.db_shirayume.execute(f"SELECT * FROM {shared.Table.moderation_logs.name}")
@@ -479,13 +479,13 @@ def setup(DB_HOST, DB_USER, DB_PASSWORD, DATABASE):
         DB_MANAGER.add_moderation_logs(moderation_logs)
         helpers.custom_print(
             level = shared.LogLevel.DEBUG,
-            function_name = "database_manager.setup",
+            function_name = "database.DatabaseManager.setup",
             description = f"DB moderation logs imported"
         )
 
         helpers.custom_print(
             level = shared.LogLevel.DEBUG,
-            function_name = "database_manager.setup",
+            function_name = "database.DatabaseManager.setup",
             description = f"Importing polls from DB..."
         )
         DB_MANAGER.db_shirayume.execute(f"SELECT * FROM {shared.Table.polls.name}")
@@ -495,24 +495,24 @@ def setup(DB_HOST, DB_USER, DB_PASSWORD, DATABASE):
             if not poll:
                 break
             model = DB_MANAGER.initialize_database_model(shared.Table.polls, **poll)
-            moderation_logs.append(model)
+            polls.append(model)
         DB_MANAGER.add_polls(polls)
         helpers.custom_print(
             level = shared.LogLevel.DEBUG,
-            function_name = "database_manager.setup",
+            function_name = "database.DatabaseManager.setup",
             description = f"DB polls imported"
         )
 
         helpers.custom_print(
             level = shared.LogLevel.INFO,
-            function_name = "database_manager.setup",
+            function_name = "database.DatabaseManager.setup",
             description = f"Database setup finished"
         )
 
     except mysql.connector.Error as e:
         helpers.custom_print(
             level = shared.LogLevel.CRITICAL,
-            function_name = "setup",
+            function_name = "database.DatabaseManager.setup",
             description = f"Failed to load data from database: {e}"
         )
         raise
