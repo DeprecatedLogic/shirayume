@@ -37,7 +37,7 @@ def custom_print(
 
     print(
         f"{description_color}{level}{' ' * (shared.LogLevel.max_length() - len(level.name))}",
-        f"{datetime_fg}{datetime.strftime(datetime.now(), '[%d-%m-%Y %H:%M:%S]')}",
+        f"{datetime_fg}{datetime.strftime(datetime.now(), '[%Y-%m-%d %H:%M:%S]')}",
         f"{function_fg}[{function_name}]",
         f"{description_color}{description}",
         default_fg,
