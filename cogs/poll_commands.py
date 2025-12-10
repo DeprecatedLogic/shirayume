@@ -20,8 +20,9 @@ class PollCreationView(View):
         self.duration_hours = 0
         self.duration_minutes = 0
         self.duration_seconds = 0
-        self.interaction: Union[discord.Interaction | None] = None
+        self.setup_interaction: Union[discord.Interaction | None] = None
         self.poll_model: Union[object, None] = None
+        self.anonymous_voting = True
 
     @discord.ui.select(
         placeholder = "Select number of options (2-25)",
@@ -35,6 +36,19 @@ class PollCreationView(View):
     @discord.ui.button(label = "Set Duration", style = discord.ButtonStyle.primary)
     async def set_duration(self, interaction: discord.Interaction, button: Button) -> None:
         await interaction.response.send_modal(PollDurationModal(self))
+
+    @discord.ui.button(label = "Anonymous Voting: ON", style = discord.ButtonStyle.green)
+    async def anonymity_toggle(self, interaction: discord.Interaction, button: Button) -> None:
+        self.anonymous_voting = not self.anonymous_voting
+        if self.anonymous_voting:
+            button.label = f"Anonymous Voting: ON"
+            button.style = discord.ButtonStyle.green
+            self.embed.set_footer(text = f"Anonymous Voting: Enabled")
+        else:
+            button.label = f"Anonymous Voting: OFF"
+            button.style = discord.ButtonStyle.red
+            self.embed.set_footer(text = f"Anonymous Voting: Disabled")
+        await interaction.response.edit_message(embed = self.embed, view = self)
     
     @discord.ui.button(label = "Create Poll", style = discord.ButtonStyle.green)
     async def create_poll(self, interaction: discord.Interaction, button: Button) -> None:
@@ -76,6 +90,7 @@ class PollCreationView(View):
         poll_model = self.poll_model
 
         if poll_model:
+
             # Rebuild the embed to show final status cleanly
             new_embed = helpers.embed_generator(
                 title = self.question,
@@ -87,45 +102,30 @@ class PollCreationView(View):
 
             options_text = "\n".join(f"`{opt}` (votes: 0)" for opt in self.options)
             new_embed.add_field(name = "Options", value = options_text, inline = False)
-
-            new_embed.add_field(name = "Poll ID", value = poll_model.poll_id, inline = False)
-            new_embed.set_footer(text = f"Created by {interaction.user.name}")
+            new_embed.add_field(name = "Anonymous Voting", value = "Enabled" if self.anonymous_voting else "Disabled", inline = False)
+            new_embed.add_field(name = "Poll ID", value = poll_model.poll_id, inline = True)
+            new_embed.set_footer(text = f"Created by {interaction.user.name}", icon_url = interaction.user.display_avatar)
             new_embed.color = discord.Color.green()
 
             self.embed = new_embed
-            await interaction.response.send_message(embed = new_embed)
-            await self.interaction.delete_original_response() # the ephemeral setup message
-            self.interaction = interaction
+            # create the voting view (select + vote button)
+            vote_view = PollVoteView(poll_model, self)
 
-            async def done_callback_func():
-                if Poll.poll_views.get(poll_model.poll_id) is None:
-                    return
-                field_index = 0
-                new_embed.set_field_at(
-                    field_index,
-                    name = new_embed.fields[field_index].name,
-                    value = f"Ended at {poll_model.ends_at.strftime('%Y-%m-%d %H:%M:%S')}",
-                    inline = new_embed.fields[field_index].inline
-                )
-                
-                field_index = 1
-                options_votes = zip(
-                    poll_model.votes.keys(),
-                    [len(voters) for voters in poll_model.votes.values()]
-                )
-                new_embed.set_field_at(
-                    field_index,
-                    name = new_embed.fields[field_index].name,
-                    value = "\n".join(
-                        f"`{option}` (votes: {votes})" for option, votes in options_votes
-                    ),
-                    inline = new_embed.fields[field_index].inline
-                )
-                new_embed.color = discord.Color.red()
-                message = await interaction.original_response()
-                await message.edit(embed = new_embed, view = None)
-                Poll.poll_views.pop(poll_model.poll_id, None)
-            
+            # send the public poll message (this uses the current interaction i.e. the button interaction)
+            await interaction.response.send_message(embed = new_embed, view = vote_view)
+
+            # store the public message object for later edits (end_poll, auto-end callback)
+            public_message = await interaction.original_response()
+            self.public_message = public_message
+
+            # delete the ephemeral setup message (self.setup_interaction was set earlier to the ephemeral setup interaction)
+            try:
+                await self.setup_interaction.delete_original_response()
+            except Exception:
+                # ignore if already deleted or missing
+                pass
+
+            # schedule auto-end task
             task = asyncio.create_task(
                 polls_service._sleep_and_finish_poll(
                     poll_id = poll_model.poll_id,
@@ -133,8 +133,50 @@ class PollCreationView(View):
                     ends_at = poll_model.ends_at
                 )
             )
-            task.add_done_callback(lambda _: asyncio.create_task(done_callback_func()))
-            Poll.poll_views[poll_model.poll_id] = self # Save the view for later reference
+            # when the task completes, update the public message (use self.public_message)
+            def done_cb(_fut):
+                async def _cb():
+                    try:
+                        embed = self.public_message.embeds[0]
+                        embed.color = discord.Color.red()
+                        field_index = 0
+                        embed.set_field_at(
+                            field_index,
+                            name = embed.fields[field_index].name,
+                            value = f"Ended at {poll_model.ends_at.strftime('%Y-%m-%d %H:%M:%S')}",
+                            inline = embed.fields[field_index].inline
+                        )
+                        field_index = 1
+                        options_votes = []
+                        for option, votes in poll_model.votes.items():
+                            options_votes.append((option, len(votes)))
+                        embed.set_field_at(
+                            field_index,
+                            name = embed.fields[field_index].name,
+                            value = "\n".join(
+                                f"`{option}` (votes: {votes}){'\nVoters: ' + ', '.join(f'<@{voter}>' for voter in poll_model.votes[option])\
+                                if not self.anonymous_voting else ''}" for option, votes in options_votes
+                            ),
+                            inline = embed.fields[field_index].inline
+                        )
+                        # Add the anonymity field
+                        embed.add_field(name = "Anonymous Voting", value = "Enabled" if self.anonymous_voting else "Disabled", inline = False)
+
+                        await self.public_message.edit(embed = embed, view = None)
+                    except Exception:
+                        helpers.custom_print(
+                            level = shared.LogLevel.ERROR,
+                            function_name = "cogs.poll_commands.PollCreationView.create_poll.done_cb",
+                            description = f"Failed to edit poll message after auto-end: {_fut.exception()}"
+                        )
+                    # Remove the view from the active poll views
+                    Poll.poll_views.pop(poll_model.poll_id, None)
+                    return
+                asyncio.create_task(_cb())
+            task.add_done_callback(done_cb)
+
+            # keep the creation view in memory so commands can access anonymity, etc
+            Poll.poll_views[poll_model.poll_id] = self
         else:
             await interaction.response.send_message(
                 content = "Failed to create poll.",
@@ -168,7 +210,7 @@ class PollOptionsModal(discord.ui.Modal):
         )
 
         new_embed.add_field(
-            name = "Options:",
+            name = "Options",
             value = options_text,
             inline = False
         )
@@ -179,23 +221,25 @@ class PollOptionsModal(discord.ui.Modal):
             self.view.duration_minutes + self.view.duration_seconds
         ) > 0:
             new_embed.add_field(
-                name = "Duration:",
-                value = (f"{self.view.duration_days:2}D {self.view.duration_hours:2}h "
-                         f"{self.view.duration_minutes:2}m {self.view.duration_seconds:2}s"),
+                name = "Duration",
+                value = (f"{self.view.duration_days:2} days {self.view.duration_hours:2} hours "
+                         f"{self.view.duration_minutes:2} minutes {self.view.duration_seconds:2} seconds"),
                 inline = False
             )
             new_embed.add_field(
                 name = "Next Step:",
                 value = "Click **Create Poll**",
-                inline = False
+                inline = True
             )
         else:
             new_embed.add_field(
                 name = "Next Step:",
                 value = "Click **Set Duration**",
-                inline = False
+                inline = True
             )
 
+        # Add the anonymity footer
+        new_embed.set_footer(text = f"Anonymous Voting: {'Enabled' if self.view.anonymous_voting else 'Disabled'}")
         # Save the new embed to the view & edit the original message
         self.view.embed = new_embed
         await interaction.response.edit_message(embed = new_embed, view = self.view)
@@ -246,13 +290,13 @@ class PollDurationModal(discord.ui.Modal):
                     f"{i+1}. {opt or '*empty*'} (votes: 0)" for i, opt in enumerate(self.view.options)
                 )
                 new_embed.add_field(
-                    name = "Options:",
+                    name = "Options",
                     value = options_text,
                     inline = False
                 )
             else:
                 new_embed.add_field(
-                    name = "Options:",
+                    name = "Options",
                     value = "No options set yet.",
                     inline = False
                 )
@@ -260,7 +304,7 @@ class PollDurationModal(discord.ui.Modal):
             # Add the new fields (duration + next step)
             new_embed.add_field(
                 name = "Duration:",
-                value = f"{days:2}D {hours:2}h {minutes:2}m {seconds:2}s",
+                value = f"{days:2} days {hours:2} hours {minutes:2} minutes {seconds:2} seconds",
                 inline = False
             )
             new_embed.add_field(
@@ -269,6 +313,9 @@ class PollDurationModal(discord.ui.Modal):
                 inline = False
             )
 
+            # Add the anonymity footer
+            new_embed.set_footer(text = f"Anonymous Voting: {'Enabled' if self.view.anonymous_voting else 'Disabled'}")
+            # Save the new embed to the view & edit the original message
             self.view.embed = new_embed
             await interaction.response.edit_message(embed = new_embed, view = self.view)
         except ValueError:
@@ -277,11 +324,119 @@ class PollDurationModal(discord.ui.Modal):
                 ephemeral = True
             )
 
+class PollOptionSelector(discord.ui.Select):
+    def __init__(self, options: list[str]):
+        opts = [discord.SelectOption(label=opt, value=opt) for opt in options]
+        super().__init__(
+            placeholder = "Pick an option to vote for...",
+            min_values = 1,
+            max_values = 1,
+            options = opts
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        # Save selection on the parent view (PollVoteView)
+        parent: "PollVoteView" = self.view  # type: ignore
+        parent.selected_option = self.values[0]
+        # Defer so UI doesn't show the "This interaction failed" toast
+        await interaction.response.defer(ephemeral = True)
+
+class PollVoteView(discord.ui.View):
+    def __init__(self, poll_model: polls_service.models.Poll, poll_view: PollCreationView):
+        super().__init__(timeout = None)
+        self.poll_model = poll_model
+        self.poll_view = poll_view
+        self.selected_option: Union[str, None] = None
+
+        # Build and add the selector from the poll options
+        options = list(self.poll_model.votes.keys())
+        self.selector = PollOptionSelector(options)
+        self.add_item(self.selector)
+
+    @discord.ui.button(label = "Vote", style = discord.ButtonStyle.success, row = 4)
+    async def vote_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # Must have picked something
+        if not self.selected_option:
+            return await interaction.response.send_message("Pick an option first.", ephemeral = True)
+
+        # Record the vote
+        ok = await polls_service.vote_poll(
+            poll_id = self.poll_model.poll_id,
+            guild_id = self.poll_model.guild_id,
+            user_id = interaction.user.id,
+            option = self.selected_option
+        )
+        if not ok:
+            return await interaction.response.send_message("Something went wrong, vote not recorded.", ephemeral = True)
+
+        # Rebuild the embed to reflect updated votes
+        new_embed = helpers.embed_generator(
+            title = self.poll_view.question,
+            description = "",
+            color = (128, 0, 128)
+        )
+
+        # status field: active or ended
+        if self.poll_model.is_active:
+            time_remaining = self.poll_model.ends_at - datetime.now()
+            time_remaining_str = str(time_remaining).split(".")[0]
+            status = f"Closes at {self.poll_model.ends_at.strftime('%Y-%m-%d %H:%M:%S')} (in {time_remaining_str})"
+            new_embed.color = discord.Color.green()
+        else:
+            status = f"Ended at {self.poll_model.ends_at.strftime('%Y-%m-%d %H:%M:%S')}"
+            new_embed.color = discord.Color.red()
+        new_embed.add_field(name = "Status", value = status, inline = False)
+
+        # options + counts (and optionally voters)
+        option_lines = []
+        for option, voters in self.poll_model.votes.items():
+            votes_count = len(voters)
+            if not self.poll_view.anonymous_voting and votes_count > 0:
+                # Use mention formatting so users are clickable in message: <@user_id>
+                voters_str = ", ".join(f"<@{v}>" for v in voters)
+                option_lines.append(f"`{option}` (votes: {votes_count})\nVoters: {voters_str}")
+            else:
+                option_lines.append(f"`{option}` (votes: {votes_count})")
+        new_embed.add_field(name = "Options", value = "\n".join(option_lines) if option_lines else "No options", inline = False)
+
+        # Anonymity field
+        new_embed.add_field(name = "Anonymous Voting", value = "Enabled" if self.poll_view.anonymous_voting else "Disabled", inline = False)
+        new_embed.add_field(name = "Poll ID", value = self.poll_model.poll_id, inline = True)
+        new_embed.set_footer(text = f"Created by {Poll.bot.get_user(self.poll_model.creator_id).name}", icon_url = Poll.bot.get_user(self.poll_model.creator_id).display_avatar)
+
+        self.poll_view.embed = new_embed
+        # Edit the message in-place. The message containing the select+vote button is available as interaction.message
+        try:
+            await interaction.message.edit(embed = new_embed, view = self)
+        except Exception:
+            # Fallback: if for some reason interaction.message isn't editable, try stored public_message
+            if getattr(self.poll_view, "public_message", None):
+                try:
+                    await self.poll_view.public_message.edit(embed = new_embed, view = self)
+                except Exception as e:
+                    helpers.custom_print(
+                        level = shared.LogLevel.ERROR,
+                        function_name = "PollVoteView.vote_button",
+                        description = f"Failed to edit poll message: {e}"
+                    )
+
+        # Acknowledge to the voter (ephemeral)
+        await interaction.response.send_message(f"You voted for **{self.selected_option}**.", ephemeral=True)
+
+        # reset selection so the user must actively pick next time
+        self.selected_option = None
+        # reset the selector displayed value
+        try:
+            self.selector.values = []
+        except Exception:
+            pass
+
 class Poll(commands.Cog):
+    bot: commands.Bot = None
     poll_views: dict[int, PollCreationView] = {}
 
     def __init__(self, bot: commands.Bot):
-        self.bot = bot
+        Poll.bot = bot
     
     @app_commands.command(name = "yumepoll", description = "Create a new poll")
     async def create_poll(self, interaction: discord.Interaction, question: str) -> None:
@@ -307,7 +462,7 @@ class Poll(commands.Cog):
                     return
             
             poll_view = Poll.poll_views[poll_id]
-            new_embed = poll_view.embed
+            new_embed = poll_view.public_message.embeds[0]
             poll_model = poll_view.poll_model
             poll_model.ends_at = datetime.now()
 
@@ -320,31 +475,38 @@ class Poll(commands.Cog):
             )
             
             field_index = 1
-            options_votes = zip(
-                poll_model.votes.keys(),
-                [len(voters) for voters in poll_model.votes.values()]
-            )
+            options_votes = []
+            for option, votes in poll_model.votes.items():
+                options_votes.append((option, len(votes)))
+
             new_embed.set_field_at(
                 field_index,
                 name = new_embed.fields[field_index].name,
                 value = "\n".join(
-                    f"`{option}` (votes: {votes})" for option, votes in options_votes
+                    f"`{option}` (votes: {votes}){'\nVoters: ' + ', '.join(f'<@{voter}>' for voter in poll_model.votes[option])\
+                    if not poll_view.anonymous_voting else ''}" for option, votes in options_votes
                 ),
                 inline = new_embed.fields[field_index].inline
             )
+            # Add the anonymity field
+            new_embed.add_field(name = "Anonymous Voting", value = "Enabled" if poll_view.anonymous_voting else "Disabled", inline = False)
+            # Set color to red to indicate ended poll status
             new_embed.color = discord.Color.red()
-            message = await poll_view.interaction.original_response()
+            # Edit the original message to reflect ended poll status
+            message = poll_view.public_message
             await message.edit(embed = new_embed, view = None)
             Poll.poll_views.pop(poll_model.poll_id, None)
             
             await interaction.response.send_message(
                 content = "Poll ended successfully.",
-                ephemeral = True
+                ephemeral = True,
+                #delete_after = 3
             )
         else:
             await interaction.response.send_message(
                 content = "Failed to end Poll. Something went wrong...",
-                ephemeral = True
+                ephemeral = True,
+                delete_after = 3
             )
 
     @app_commands.command(name = "yumepolls", description = "See all your active polls")
@@ -358,8 +520,10 @@ class Poll(commands.Cog):
                 description = "",
                 color = (128, 0, 128)
             )
-            
+
             for poll in polls:
+                poll_view = Poll.poll_views.get(poll.poll_id, None)
+
                 embed.add_field(
                     name = f"\n[Poll ID {poll.poll_id}]",
                     value = poll.question,
@@ -379,14 +543,22 @@ class Poll(commands.Cog):
                     inline = False
                 )
 
-                options = poll.votes.keys()
-                votes = [len(v) for v in poll.votes.values()]
-                results = "\n".join(
-                    f"`{option}`: {votes}" for option, votes in zip(options, votes)
-                )
+                options_votes = []
+                for option, votes in poll.votes.items():
+                    options_votes.append((option, len(votes)))
+
                 embed.add_field(
                     name = "Results",
-                    value = results,
+                    value = "\n".join(
+                    f"`{option}` (votes: {votes}){'\nVoters: ' + ', '.join(f'<@{voter}>' for voter in poll.votes[option])\
+                    if not poll_view.anonymous_voting else ''}" for option, votes in options_votes
+                    ),
+                    inline = False
+                )
+                # Add anonymity field
+                embed.add_field(
+                    name = "Anonymous Voting",
+                    value = "Enabled" if poll_view.anonymous_voting else "Disabled",
                     inline = False
                 )
 
@@ -426,21 +598,27 @@ class Poll(commands.Cog):
                 inline = new_embed.fields[field_index].inline
             )
 
-            # Update the votes in the embed while we're at it
+            # Update the votes in the embed while we're at it & show voters if not anonymous
             field_index = 1
-            options_votes = zip(
-                poll_model.votes.keys(),
-                [len(voters) for voters in poll_model.votes.values()]
-            )
+            options_votes = []
+            for option, votes in poll_model.votes.items():
+                options_votes.append((option, len(votes)))
+
             new_embed.set_field_at(
                 field_index,
                 name = new_embed.fields[field_index].name,
                 value = "\n".join(
-                    f"`{option}` (votes: {votes})" for option, votes in options_votes
+                    f"`{option}` (votes: {votes}){'\nVoters: ' + ', '.join(f'<@{voter}>' for voter in poll_model.votes[option])\
+                    if not poll_view.anonymous_voting else ''}" for option, votes in options_votes
                 ),
                 inline = new_embed.fields[field_index].inline
             )
-            message = await poll_view.interaction.original_response()
+            # Add the anonymity field
+            new_embed.add_field(name = "Anonymous Voting", value = "Enabled" if poll_view.anonymous_voting else "Disabled", inline = False)
+            # Set color to green to indicate active poll status
+            new_embed.color = discord.Color.green()
+            # Edit the original message to reflect updated poll status
+            message = poll_view.public_message
             await message.edit(embed = new_embed, view = None)
 
             await interaction.response.send_message(
@@ -455,8 +633,8 @@ class Poll(commands.Cog):
             )
 
     @app_commands.command(name = "yumecancelvote", description = "Cancel your vote from a poll")
-    async def cancel_vote(self, interaction: discord.Interaction, poll_id: int, option: str) -> None:
-        if await polls_service.cancel_vote(poll_id, interaction.guild_id, interaction.user.id):
+    async def cancel_vote(self, interaction: discord.Interaction, poll_id: int) -> None:
+        if await polls_service.cancel_vote_poll(poll_id, interaction.guild_id, interaction.user.id):
             await interaction.response.send_message(
                 content = f"You cancelled your vote.",
                 ephemeral = True
