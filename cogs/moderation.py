@@ -1,5 +1,5 @@
 from datetime import datetime, timezone, timedelta
-from services import moderation_service
+from services import moderation
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -25,7 +25,7 @@ class Moderation(commands.Cog):
             )
             await interaction.response.send_message(embed = embed)
 
-            moderation_service.import_moderation_logs(
+            moderation.import_moderation_logs(
             mlog_id = -1,
             guild_id = interaction.guild.id,
             user_id = member.id,
@@ -65,7 +65,7 @@ class Moderation(commands.Cog):
             )
             await interaction.response.send_message(embed = embed)
 
-            moderation_service.import_moderation_logs(
+            moderation.import_moderation_logs(
             mlog_id = -1,
             guild_id = interaction.guild.id,
             user_id = member.id,
@@ -105,7 +105,7 @@ class Moderation(commands.Cog):
             )
             await interaction.response.send_message(embed = embed)
 
-            moderation_service.import_moderation_logs(
+            moderation.import_moderation_logs(
             mlog_id = -1,
             guild_id = interaction.guild.id,
             user_id = user.id,
@@ -157,7 +157,7 @@ class Moderation(commands.Cog):
             )
             await interaction.response.send_message(embed = embed)
 
-            moderation_service.import_moderation_logs(
+            moderation.import_moderation_logs(
             mlog_id = -1,
             guild_id = interaction.guild.id,
             user_id = member.id,
@@ -204,7 +204,7 @@ class Moderation(commands.Cog):
             )
             await interaction.response.send_message(embed = embed)
 
-            moderation_service.import_moderation_logs(
+            moderation.import_moderation_logs(
             mlog_id = -1,
             guild_id = interaction.guild.id,
             user_id = member.id,
@@ -243,7 +243,7 @@ class Moderation(commands.Cog):
             )
             await interaction.response.send_message(embed = embed)
 
-            moderation_service.import_moderation_logs(
+            moderation.import_moderation_logs(
             mlog_id = -1,
             guild_id = interaction.guild.id,
             user_id = member.id,
@@ -294,7 +294,7 @@ class Moderation(commands.Cog):
             )
             await interaction.followup.send(embed = embed, ephemeral=True)
 
-            moderation_service.import_moderation_logs(
+            moderation.import_moderation_logs(
             mlog_id = -1,
             guild_id = interaction.guild.id,
             user_id = member.id,

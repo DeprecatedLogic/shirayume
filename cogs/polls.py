@@ -1,7 +1,7 @@
 #from typing import List
 import datetime as dt
 from datetime import datetime
-from services import polls_service
+from services import polls
 import discord
 from discord.ui import View, Button, Select, TextInput
 from discord import app_commands
@@ -86,7 +86,7 @@ class PollCreationView(View):
             ),
             "is_dirty": True
         }
-        self.poll_model = await polls_service.create_poll(**poll)
+        self.poll_model = await polls.create_poll(**poll)
         poll_model = self.poll_model
 
         if poll_model:
@@ -127,7 +127,7 @@ class PollCreationView(View):
 
             # schedule auto-end task
             task = asyncio.create_task(
-                polls_service._sleep_and_finish_poll(
+                polls._sleep_and_finish_poll(
                     poll_id = poll_model.poll_id,
                     guild_id = poll_model.guild_id,
                     ends_at = poll_model.ends_at
@@ -342,7 +342,7 @@ class PollOptionSelector(discord.ui.Select):
         await interaction.response.defer(ephemeral = True)
 
 class PollVoteView(discord.ui.View):
-    def __init__(self, poll_model: polls_service.models.Poll, poll_view: PollCreationView):
+    def __init__(self, poll_model: polls.models.Poll, poll_view: PollCreationView):
         super().__init__(timeout = None)
         self.poll_model = poll_model
         self.poll_view = poll_view
@@ -360,7 +360,7 @@ class PollVoteView(discord.ui.View):
             return await interaction.response.send_message("Pick an option first.", ephemeral = True)
 
         # Record the vote
-        ok = await polls_service.vote_poll(
+        ok = await polls.vote_poll(
             poll_id = self.poll_model.poll_id,
             guild_id = self.poll_model.guild_id,
             user_id = interaction.user.id,
@@ -457,7 +457,7 @@ class Poll(commands.Cog):
 
     @app_commands.command(name = "yumepollend", description = "End an existing poll")
     async def end_poll(self, interaction: discord.Interaction, poll_id: int) -> None:
-        if await polls_service.end_poll(poll_id, interaction.user.id, interaction.guild_id):
+        if await polls.end_poll(poll_id, interaction.user.id, interaction.guild_id):
             if Poll.poll_views.get(poll_id) is None:
                     return
             
@@ -513,7 +513,7 @@ class Poll(commands.Cog):
     async def show_active_polls(self, interaction: discord.Interaction, user: discord.User = None) -> None:        
         user_id = interaction.user.id if not user else user.id
 
-        polls = await polls_service.get_active_polls(user_id, interaction.guild_id)
+        polls = await polls.get_active_polls(user_id, interaction.guild_id)
         if polls:
             embed = helpers.embed_generator(
                 title = f"Active Polls for {self.bot.get_user(user_id)}",
@@ -575,7 +575,7 @@ class Poll(commands.Cog):
     
     @app_commands.command(name = "yumepollvote", description = "Vote for a poll")
     async def vote_poll(self, interaction: discord.Interaction, poll_id: int, option: str) -> None:
-        if await polls_service.vote_poll(poll_id, interaction.guild_id, interaction.user.id, option):
+        if await polls.vote_poll(poll_id, interaction.guild_id, interaction.user.id, option):
             if Poll.poll_views.get(poll_id) is None:
                     return
             
@@ -634,7 +634,7 @@ class Poll(commands.Cog):
 
     @app_commands.command(name = "yumecancelvote", description = "Cancel your vote from a poll")
     async def cancel_vote(self, interaction: discord.Interaction, poll_id: int) -> None:
-        if await polls_service.cancel_vote_poll(poll_id, interaction.guild_id, interaction.user.id):
+        if await polls.cancel_vote_poll(poll_id, interaction.guild_id, interaction.user.id):
             await interaction.response.send_message(
                 content = f"You cancelled your vote.",
                 ephemeral = True

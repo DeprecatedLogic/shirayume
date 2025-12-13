@@ -1,7 +1,7 @@
 import os
 import dotenv
 from database import database_manager
-from cogs import moderation, economy, poll_commands, rankings, utilities_commands, web_scraping_commands
+from cogs import moderation, economy, polls, rankings, utilities, web_scraping
 from cogs.minigames import basic
 import discord
 from discord.ext import commands
@@ -83,7 +83,7 @@ async def on_ready() -> None:
     
     await moderation.setup(bot)
     #economy.setup(bot, config)
-    await poll_commands.setup(bot)
+    await polls.setup(bot)
     #rankings.setup(bot)
     #utilities_commands.setup(bot, config)
     #web_scraping_commands.setup(bot, config)

@@ -1,4 +1,4 @@
-from services import rankings_service
+from services import rankings
 import discord
 from discord.ext import commands
 from utils import shared
