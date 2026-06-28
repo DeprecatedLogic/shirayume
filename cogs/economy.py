@@ -1,5 +1,7 @@
 import discord
 from discord.ext import commands
+from utils import shared, helpers
+from utils.shared import SHIRAYUME
 
 class Shop():
     
@@ -8,8 +10,8 @@ class Shop():
 
 class Economy(commands.Cog):
 
-    def __init__(self, bot: commands.Bot):
-        self.bot = bot
+    def __init__(self):
+        pass
 
-def setup(bot: commands.Bot, config: dict):
+def setup(config: dict):
     pass

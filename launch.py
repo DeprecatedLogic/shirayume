@@ -1,7 +1,8 @@
 import os
 import dotenv
 from database import database_manager
-from cogs import moderation, economy, polls, rankings, utilities, web_scraping
+from cogs import moderation, economy, polls, rankings, utilities, web_scraping, statistics
+from cogs.admin import utilities as admin_utilities
 from cogs.minigames import basic
 import discord
 from discord.ext import commands
@@ -9,10 +10,26 @@ import json
 #import asyncio
 from utils import shared, helpers
 from database import database_manager, models
-import datetime
+from datetime import datetime
 from typing import List
 
-bot = commands.Bot("EXE>", intents = discord.Intents.all())
+shared.SHIRAYUME = commands.Bot("!>", intents = discord.Intents.all())
+
+def get_new_year() -> datetime:
+    """ Get new year's datetime. """
+
+    # Set New Year date
+    year = datetime.today().year + 1
+
+    # Only if New Year set date to today
+    if datetime.today().day == datetime.today().month == 1:
+        year -= 1
+
+    return datetime(
+        year = year,
+        month = 1,
+        day = 1
+    )
 
 async def setup_bot() -> None:
     DB_MANAGER = database_manager.DB_MANAGER
@@ -23,11 +40,10 @@ async def setup_bot() -> None:
             description = f"DB_MANAGER ({DB_MANAGER}) has not been initialized"
         )
         raise RuntimeError("DB_MANAGER not initialized")
-    #bot.remove_command("help")
-    #bot.help_command = None
+    
     guilds: List[models.Guild] = []
     users_per_guild: List[List[models.User]] = []
-    for guild in bot.guilds:
+    for guild in shared.SHIRAYUME.guilds:
         helpers.custom_print(
             level = shared.LogLevel.INFO,
             function_name = "launch.setup_bot",
@@ -45,8 +61,8 @@ async def setup_bot() -> None:
             welcome_channel = -1,
             leave_channel = -1,
             joined_at = guild.me.joined_at,
-            created_at = datetime.datetime.now(),
-            updated_at = datetime.datetime.now(),
+            created_at = datetime.now(),
+            updated_at = datetime.now(),
             is_dirty = False,
             is_deleted = False
         )
@@ -60,8 +76,8 @@ async def setup_bot() -> None:
                 avatar_url = str(member.avatar.url) if member.avatar else "",
                 is_bot = member.bot,
                 currency = 0,
-                created_at = datetime.datetime.now(),
-                updated_at = datetime.datetime.now(),
+                created_at = datetime.now(),
+                updated_at = datetime.now(),
                 is_dirty = False,
                 is_deleted = False
             )
@@ -73,21 +89,22 @@ async def setup_bot() -> None:
     
     DB_MANAGER.add_guilds(guilds)
 
-@bot.event
+@shared.SHIRAYUME.event
 async def on_ready() -> None:
     helpers.custom_print(
         level = shared.LogLevel.INFO,
         function_name = "launch.on_ready",
-        description = f"Bot connected as {bot.user} (ID: {bot.user.id})"
+        description = f"Bot connected as {shared.SHIRAYUME.user} (ID: {shared.SHIRAYUME.user.id})"
     )
-    
-    await moderation.setup(bot)
-    #economy.setup(bot, config)
-    await polls.setup(bot)
-    #rankings.setup(bot)
-    #utilities_commands.setup(bot, config)
-    #web_scraping_commands.setup(bot, config)
-    await basic.setup(bot)
+
+    await moderation.setup()
+    #economy.setup()
+    await polls.setup()
+    #rankings.setup()
+    #utilities_commands.setup()
+    #web_scraping_commands.setup()
+    await basic.setup()
+    await statistics.setup()
 
     helpers.custom_print(
         level = shared.LogLevel.INFO,
@@ -101,9 +118,9 @@ async def on_ready() -> None:
     )
     try:
         #GUILD_ID = 1183463468020531343
-        #synced_guild = await bot.tree.sync(guild = bot.get_guild(GUILD_ID))
-        #print(f"Synced {len(synced_guild)} commands to guild {bot.get_guild(GUILD_ID).name}")
-        synced_globally = await bot.tree.sync()
+        #synced_guild = await shared.SHIRAYUME.tree.sync(guild = shared.SHIRAYUME.get_guild(GUILD_ID))
+        #print(f"Synced {len(synced_guild)} commands to guild {shared.SHIRAYUME.get_guild(GUILD_ID).name}")
+        synced_globally = await shared.SHIRAYUME.tree.sync()
         helpers.custom_print(
             level = shared.LogLevel.INFO,
             function_name = "launch.on_ready",
@@ -119,9 +136,15 @@ async def on_ready() -> None:
     await setup_bot()
 
 def launch() -> None:
+
     with open("config.json", "r") as config_file:
-        config = json.load(config_file)
-        #config_string = json.dumps(config, indent = 4)
+        config: dict = json.load(config_file)
+        new_year = get_new_year()
+
+        shared.GLOBAL_CONFIG = config
+        shared.GLOBAL_CONFIG["new_year"] = new_year
+        shared.SHIRAYUME.command_prefix = config["bot_prefix"]
+
         helpers.custom_print(
             level = shared.LogLevel.INFO,
             function_name = "launch",
@@ -147,6 +170,7 @@ def launch() -> None:
         level = shared.LogLevel.DEBUG,
         function_name = "launch",
         description = f"""
+        Bot Prefix: {shared.SHIRAYUME.command_prefix}
         DB Host: {DB_HOST}
         DB User: {DB_USER}
         DB Password: {DB_PASSWORD}
@@ -156,7 +180,8 @@ def launch() -> None:
         """
     )
     database_manager.setup(DB_HOST, DB_USER, DB_PASSWORD, DATABASE)
-    bot.run(DISCORD_TOKEN, reconnect = True)
+    admin_utilities.setup()
+    shared.SHIRAYUME.run(DISCORD_TOKEN, reconnect = True)
 
 if __name__ == "__main__":
     launch()

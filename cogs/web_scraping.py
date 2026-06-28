@@ -1,13 +1,11 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
-from services.web_scraping_service import WebScraper
+from services.web_scraping import WebScraper
 from utils import shared, helpers
 from random import choice
 
 class WebScraping(commands.Cog):
-    def __init__(self, bot: commands.Bot):
-        self.bot = bot
 
     @app_commands.command(name = "dailyquote", description = "Get a quote from BrainyQuote (updated daily)")
     async def daily_quote(self, interaction: discord.Interaction):
@@ -50,7 +48,7 @@ class WebScraping(commands.Cog):
                 description = f"An error occured: {e}"
             )
 
-    # WARNING: Do not use, doesn't work yet
+    # WARNING: Do not use, does not work yet
     @app_commands.command(name = "mal", description = "Get info for a specific anime/manga (usually up-to-date lol)")
     async def mal(self, interaction: discord.Interaction, title: str, manga: bool = False):
         try:
@@ -65,7 +63,7 @@ class WebScraping(commands.Cog):
                     WebScraper.extract_mal_data,
                     content
                 )
-                # todo: format descrption and fix embed below
+                # todo: format description and fix embed below
                 formatted_description = f""
                 embed = helpers.embed_generator(
                     title = extracted_data['title'],
@@ -82,7 +80,7 @@ class WebScraping(commands.Cog):
         except Exception as e:
             embed = helpers.embed_generator(
                 title = "MAL",
-                description = f"I failed to fetch the data for '{title}'... sorry!",
+                description = f"I failed to fetch the data for `{title}`... sorry!",
             )
             await interaction.response.send_message(embed = embed, ephemeral = True)
             helpers.custom_print(
@@ -91,5 +89,5 @@ class WebScraping(commands.Cog):
                 description = f"An error occured: {e}"
             )
 
-async def setup(bot: commands.Bot):
-    await bot.add_cog(WebScraping(bot))
+async def setup():
+    await shared.SHIRAYUME.add_cog(WebScraping())

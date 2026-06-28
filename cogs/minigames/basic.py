@@ -127,8 +127,7 @@ class Minigames(commands.Cog):
                 pass
             self.cog.remove_game("guess", self.game.user_id)
 
-    def __init__(self, bot: commands.Bot):
-        self.bot = bot
+    def __init__(self):
         self.active_games: dict[str, dict[int, NumberGame]] = defaultdict(dict)
 
     def remove_game(self, game_name: str, user_id: int):
@@ -223,5 +222,5 @@ class Minigames(commands.Cog):
     def event():
         pass
 
-async def setup(bot: commands.Bot):
-    await bot.add_cog(Minigames(bot))
+async def setup():
+    await shared.SHIRAYUME.add_cog(Minigames())

@@ -5,11 +5,8 @@ from utils import shared
 
 class Rankings(commands.Cog):
     
-    def __init__(self, bot: commands.Bot):
-        self.bot = bot
+    def __init__(self):
         self.users = []
 
-    
-
-def setup(bot: commands.Bot, config: dict):
+def setup(config: dict):
     bot.add_cog()

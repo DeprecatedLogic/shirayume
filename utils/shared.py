@@ -1,6 +1,9 @@
 from enum import Enum, auto
 import blessed
+
+GLOBAL_CONFIG = {}
 GLOBAL_TERMINAL = blessed.Terminal()
+SHIRAYUME = None
 
 class LogLevel(Enum):
     """ Defines logging levels with priority. """
