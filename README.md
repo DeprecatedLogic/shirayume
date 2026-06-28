@@ -13,14 +13,14 @@ Your Discord’s secret sauce of economy chaos, mod magic, mini-game madness, an
 ## Getting Started
 
 ### Prerequisites
-- Make sure `Python 3.11` or newer is installed.
+- Make sure `Python 3.13` or newer is installed.
 - MariaDB server (for persistent storage)
 - A Discord bot token (get one from the [Discord Developer Portal](https://discord.com/developers/applications))
 
 ### How to run
 1. Clone this repository & navigate to the directory
 ```
-git clone https://github.com/ItzKarizma/Shirayume.exe.git
+git clone https://github.com/DeprecatedLogic/Shirayume.exe.git
 cd Shirayume.exe
 ```
 2. Create and configure a virtual environment for Python
@@ -62,7 +62,7 @@ Shirayume.exe is organized for clarity and modularity:
 The bot ties together via `launch.py`, which loads cogs, connects to Discord, and uses services and the database for seamless operation.
 
 ## Author Notes
-Fueled by late-night catpuccino. - [ItzKarizma](https://github.com/ItzKarizma)
+Fueled by late-night catpuccino. - [DeprecatedLogic](https://github.com/DeprecatedLogic)
 
 ## License
 Licensed under a custom MIT license for personal and educational use only. No commercial shenanigans allowed, keep it chill and code for fun!
