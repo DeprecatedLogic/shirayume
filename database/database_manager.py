@@ -1,7 +1,6 @@
 import os
 import json
 import mysql.connector
-import mysql.connector.cursor_cext
 from typing import Union, List, Dict
 from database import models
 from datetime import datetime
@@ -23,9 +22,10 @@ class DatabaseManager():
                 host = DB_HOST,
                 user = DB_USER,
                 password = DB_PASSWORD,
-                database = DATABASE
+                database = DATABASE,
+                use_pure = True
             )
-            self.db_shirayume = self.db_connection.cursor(cursor_class = mysql.connector.cursor_cext.CMySQLCursorDict)
+            self.db_shirayume = self.db_connection.cursor(dictionary=True)
 
         except mysql.connector.Error as e:
             helpers.custom_print(
