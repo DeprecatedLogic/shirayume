@@ -1,7 +1,7 @@
 #from typing import List
 import datetime as dt
 from datetime import datetime
-from services import polls
+from services import polls as polls_service
 import discord
 from discord.ui import View, Button, Select, TextInput
 from discord import app_commands
@@ -24,15 +24,11 @@ class PollCreationView(View):
         self.poll_model: Union[object, None] = None
         self.anonymous_voting = True
 
-    @discord.ui.select(
-        placeholder = "Select number of options (2-25)",
-        options = [discord.SelectOption(label = str(i), value = str(i)) for i in range(2, 26)]
-    ) # can omit value since it will default to the label but I used it for the experience :P
-    async def option_count(self, interaction: discord.Interaction, select: Select) -> None:
-        num_options = int(select.values[0])
-        self.options = [""] * num_options
+    @discord.ui.button(label = "Set Options", style = discord.ButtonStyle.primary)
+    async def set_options(self, interaction: discord.Interaction, button: Button) -> None:
+        # Send the modal to the user
         await interaction.response.send_modal(PollOptionsModal(self))
-    
+
     @discord.ui.button(label = "Set Duration", style = discord.ButtonStyle.primary)
     async def set_duration(self, interaction: discord.Interaction, button: Button) -> None:
         await interaction.response.send_modal(PollDurationModal(self))
@@ -48,7 +44,7 @@ class PollCreationView(View):
             button.label = f"Anonymous Voting: OFF"
             button.style = discord.ButtonStyle.red
             self.embed.set_footer(text = f"Anonymous Voting: Disabled")
-        await interaction.response.edit_message(embed = self.embed, view = self)
+        await interaction.response.edit_message(embed=self.embed, view=self)
     
     @discord.ui.button(label = "Create Poll", style = discord.ButtonStyle.green)
     async def create_poll(self, interaction: discord.Interaction, button: Button) -> None:
@@ -86,7 +82,7 @@ class PollCreationView(View):
             ),
             "is_dirty": True
         }
-        self.poll_model = await polls.create_poll(**poll)
+        self.poll_model = await polls_service.create_poll(**poll)
         poll_model = self.poll_model
 
         if poll_model:
@@ -112,30 +108,45 @@ class PollCreationView(View):
             vote_view = PollVoteView(poll_model, self)
 
             # send the public poll message (this uses the current interaction i.e. the button interaction)
-            await interaction.response.send_message(embed = new_embed, view = vote_view)
-
-            # store the public message object for later edits (end_poll, auto-end callback)
+            try:
+                await interaction.response.send_message(embed = new_embed, view = vote_view)
+                # At this point we can stop listening for button interactions
+                self.stop()
+            except Exception:
+                response = await polls_service.end_poll(
+                    self.poll_model.poll_id,
+                    self.poll_model.creator_id,
+                    self.poll_model.guild_id
+                )
+                helpers.custom_print(
+                    level=shared.LogLevel.ERROR,
+                    function_name="cogs.poll_commands.PollCreationView.create_poll",
+                    description="Failed to send the poll message after clicking on 'Create Poll'"
+                )
+                return
+            
+            # Store the public message object for later edits (end_poll, auto-end callback)
             public_message = await interaction.original_response()
             self.public_message = public_message
 
-            # delete the ephemeral setup message (self.setup_interaction was set earlier to the ephemeral setup interaction)
+            # Delete the ephemeral setup message (self.setup_interaction was set earlier to the ephemeral setup interaction)
             try:
                 await self.setup_interaction.delete_original_response()
             except Exception:
-                # ignore if already deleted or missing
+                # Ignore if already deleted or missing
                 pass
 
-            # schedule auto-end task
+            # Schedule auto-end task
             task = asyncio.create_task(
-                polls._sleep_and_finish_poll(
+                polls_service._sleep_and_finish_poll(
                     poll_id = poll_model.poll_id,
                     guild_id = poll_model.guild_id,
                     ends_at = poll_model.ends_at
                 )
             )
-            # when the task completes, update the public message (use self.public_message)
-            def done_cb(_fut):
-                async def _cb():
+            # When the task completes, update the public message (use self.public_message)
+            def done_callback(_future):
+                async def _callback():
                     try:
                         embed = self.public_message.embeds[0]
                         embed.color = discord.Color.red()
@@ -143,7 +154,7 @@ class PollCreationView(View):
                         embed.set_field_at(
                             field_index,
                             name = embed.fields[field_index].name,
-                            value = f"Ended at {poll_model.ends_at.strftime('%Y-%m-%d %H:%M:%S')}",
+                            value = f"Closed at {poll_model.ends_at.strftime('%Y-%m-%d %H:%M:%S')}",
                             inline = embed.fields[field_index].inline
                         )
                         field_index = 1
@@ -166,16 +177,16 @@ class PollCreationView(View):
                     except Exception:
                         helpers.custom_print(
                             level = shared.LogLevel.ERROR,
-                            function_name = "cogs.poll_commands.PollCreationView.create_poll.done_cb",
-                            description = f"Failed to edit poll message after auto-end: {_fut.exception()}"
+                            function_name = "cogs.poll_commands.PollCreationView.create_poll.done_callback",
+                            description = f"Failed to edit poll message after auto-end: {_future.exception()}"
                         )
                     # Remove the view from the active poll views
                     Poll.poll_views.pop(poll_model.poll_id, None)
                     return
-                asyncio.create_task(_cb())
-            task.add_done_callback(done_cb)
+                asyncio.create_task(_callback())
+            task.add_done_callback(done_callback)
 
-            # keep the creation view in memory so commands can access anonymity, etc
+            # Keep the creation view in memory so commands can access anonymity value, etc
             Poll.poll_views[poll_model.poll_id] = self
         else:
             await interaction.response.send_message(
@@ -188,15 +199,27 @@ class PollOptionsModal(discord.ui.Modal):
         super().__init__(title = "Enter Poll Options")
         self.view = view
 
-        for i in range(len(view.options)):
-            self.add_item(TextInput(
-                label = f"Option {i+1}",
-                placeholder = f"Enter option {i+1}",
-                max_length = 100
-            ))
+        # Create a single paragraph-style text input
+        self.options_input = TextInput(
+            label = "Options (One per line, Max 25)",
+            style = discord.TextStyle.paragraph,
+            placeholder = "Option 1\nOption 2\n...",
+            required = True,
+            max_length = 4000
+        )
+        self.add_item(self.options_input)
     
     async def on_submit(self, interaction: discord.Interaction) -> None:
-        self.view.options = [child.value.strip() for child in self.children]
+        raw_lines = self.options_input.value.split('\n')
+        self.view.options = [line.strip() for line in raw_lines if line.strip()][:25]
+
+        # Check if they provided at least 2 options
+        if len(self.view.options) < 2:
+            await interaction.response.send_message(
+                content = "You must provide at least 2 options.",
+                ephemeral = True
+            )
+            return
 
         # Rebuild the embed
         new_embed = helpers.embed_generator(
@@ -206,7 +229,7 @@ class PollOptionsModal(discord.ui.Modal):
         )
 
         options_text = "\n".join(
-            f"{i+1}. {opt or '*empty*'} (votes: 0)" for i, opt in enumerate(self.view.options)
+            f"{i+1}. {option} (votes: 0)" for i, option in enumerate(self.view.options)
         )
 
         new_embed.add_field(
@@ -242,7 +265,7 @@ class PollOptionsModal(discord.ui.Modal):
         new_embed.set_footer(text = f"Anonymous Voting: {'Enabled' if self.view.anonymous_voting else 'Disabled'}")
         # Save the new embed to the view & edit the original message
         self.view.embed = new_embed
-        await interaction.response.edit_message(embed = new_embed, view = self.view)
+        await interaction.response.edit_message(embed=new_embed, view=self.view)
 
 class PollDurationModal(discord.ui.Modal):
     days = TextInput(label = "Days (0-90)", default = "0", max_length = 2)
@@ -342,7 +365,7 @@ class PollOptionSelector(discord.ui.Select):
         await interaction.response.defer(ephemeral = True)
 
 class PollVoteView(discord.ui.View):
-    def __init__(self, poll_model: polls.models.Poll, poll_view: PollCreationView):
+    def __init__(self, poll_model: polls_service.models.Poll, poll_view: PollCreationView):
         super().__init__(timeout = None)
         self.poll_model = poll_model
         self.poll_view = poll_view
@@ -360,7 +383,7 @@ class PollVoteView(discord.ui.View):
             return await interaction.response.send_message("Pick an option first.", ephemeral = True)
 
         # Record the vote
-        ok = await polls.vote_poll(
+        ok = await polls_service.vote_poll(
             poll_id = self.poll_model.poll_id,
             guild_id = self.poll_model.guild_id,
             user_id = interaction.user.id,
@@ -376,7 +399,7 @@ class PollVoteView(discord.ui.View):
             color = (128, 0, 128)
         )
 
-        # status field: active or ended
+        # Status field: active or ended
         if self.poll_model.is_active:
             time_remaining = self.poll_model.ends_at - datetime.now()
             time_remaining_str = str(time_remaining).split(".")[0]
@@ -387,7 +410,7 @@ class PollVoteView(discord.ui.View):
             new_embed.color = discord.Color.red()
         new_embed.add_field(name = "Status", value = status, inline = False)
 
-        # options + counts (and optionally voters)
+        # Options + counts (and optionally voters)
         option_lines = []
         for option, voters in self.poll_model.votes.items():
             votes_count = len(voters)
@@ -402,7 +425,7 @@ class PollVoteView(discord.ui.View):
         # Anonymity field
         new_embed.add_field(name = "Anonymous Voting", value = "Enabled" if self.poll_view.anonymous_voting else "Disabled", inline = False)
         new_embed.add_field(name = "Poll ID", value = self.poll_model.poll_id, inline = True)
-        new_embed.set_footer(text = f"Created by {Poll.bot.get_user(self.poll_model.creator_id).name}", icon_url = Poll.bot.get_user(self.poll_model.creator_id).display_avatar)
+        new_embed.set_footer(text = f"Created by {shared.SHIRAYUME.get_user(self.poll_model.creator_id).name}", icon_url = shared.SHIRAYUME.get_user(self.poll_model.creator_id).display_avatar)
 
         self.poll_view.embed = new_embed
         # Edit the message in-place. The message containing the select+vote button is available as interaction.message
@@ -423,20 +446,16 @@ class PollVoteView(discord.ui.View):
         # Acknowledge to the voter (ephemeral)
         await interaction.response.send_message(f"You voted for **{self.selected_option}**.", ephemeral=True)
 
-        # reset selection so the user must actively pick next time
+        # Reset selection so the user must actively pick next time
         self.selected_option = None
-        # reset the selector displayed value
+        # Reset the selector displayed value
         try:
             self.selector.values = []
         except Exception:
             pass
 
 class Poll(commands.Cog):
-    bot: commands.Bot = None
     poll_views: dict[int, PollCreationView] = {}
-
-    def __init__(self, bot: commands.Bot):
-        Poll.bot = bot
     
     @app_commands.command(name = "yumepoll", description = "Create a new poll")
     async def create_poll(self, interaction: discord.Interaction, question: str) -> None:
@@ -452,12 +471,12 @@ class Poll(commands.Cog):
             color = (128, 0, 128)
         )
         view = PollCreationView(question, embed)
-        view.interaction = interaction
+        view.setup_interaction = interaction
         await interaction.response.send_message(embed = embed, view = view, ephemeral = True)
 
     @app_commands.command(name = "yumepollend", description = "End an existing poll")
     async def end_poll(self, interaction: discord.Interaction, poll_id: int) -> None:
-        if await polls.end_poll(poll_id, interaction.user.id, interaction.guild_id):
+        if await polls_service.end_poll(poll_id, interaction.user.id, interaction.guild_id):
             if Poll.poll_views.get(poll_id) is None:
                     return
             
@@ -513,10 +532,10 @@ class Poll(commands.Cog):
     async def show_active_polls(self, interaction: discord.Interaction, user: discord.User = None) -> None:        
         user_id = interaction.user.id if not user else user.id
 
-        polls = await polls.get_active_polls(user_id, interaction.guild_id)
+        polls = await polls_service.get_active_polls(user_id, interaction.guild_id)
         if polls:
             embed = helpers.embed_generator(
-                title = f"Active Polls for {self.bot.get_user(user_id)}",
+                title = f"Active Polls for {shared.SHIRAYUME.get_user(user_id)}",
                 description = "",
                 color = (128, 0, 128)
             )
@@ -568,14 +587,14 @@ class Poll(commands.Cog):
             )
         else:
             await interaction.response.send_message(
-                content = f"User {self.bot.get_user(user_id)} doesn't have any active polls.",
+                content = f"User {shared.SHIRAYUME.get_user(user_id)} doesn't have any active polls.",
                 ephemeral = True,
                 #delete_after = 3
             )
     
     @app_commands.command(name = "yumepollvote", description = "Vote for a poll")
     async def vote_poll(self, interaction: discord.Interaction, poll_id: int, option: str) -> None:
-        if await polls.vote_poll(poll_id, interaction.guild_id, interaction.user.id, option):
+        if await polls_service.vote_poll(poll_id, interaction.guild_id, interaction.user.id, option):
             if Poll.poll_views.get(poll_id) is None:
                     return
             
@@ -634,7 +653,7 @@ class Poll(commands.Cog):
 
     @app_commands.command(name = "yumecancelvote", description = "Cancel your vote from a poll")
     async def cancel_vote(self, interaction: discord.Interaction, poll_id: int) -> None:
-        if await polls.cancel_vote_poll(poll_id, interaction.guild_id, interaction.user.id):
+        if await polls_service.cancel_vote_poll(poll_id, interaction.guild_id, interaction.user.id):
             await interaction.response.send_message(
                 content = f"You cancelled your vote.",
                 ephemeral = True
@@ -646,5 +665,5 @@ class Poll(commands.Cog):
                 delete_after = 3
             )
 
-async def setup(bot: commands.Bot) -> None:
-    await bot.add_cog(Poll(bot))
+async def setup() -> None:
+    await shared.SHIRAYUME.add_cog(Poll())
