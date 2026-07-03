@@ -13,7 +13,7 @@ from database import database_manager, models
 from datetime import datetime
 from typing import List
 
-shared.SHIRAYUME = commands.Bot("!>", intents = discord.Intents.all())
+shared.SHIRAYUME = commands.Bot("!>", intents = discord.Intents.all(), help_command=None)
 
 def get_new_year() -> datetime:
     """ Get new year's datetime. """

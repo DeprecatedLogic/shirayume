@@ -53,7 +53,14 @@
             "event": false
         },
         "statistics": {
-            "is_enabled": false
+            "is_enabled": true,
+            "category_name": "📊 Server Statistics",
+            "channels": {
+                "all": "All Members: {}",
+                "active": "Active Members: {}",
+                "inactive": "Inactive Members: {}",
+                "bots": "Bots: {}"
+            }
         }
     }
 }

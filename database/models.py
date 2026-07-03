@@ -175,7 +175,10 @@ class Guild():
         created_at: datetime,
         updated_at: datetime,
         is_dirty: bool,
-        is_deleted: bool
+        is_deleted: bool,
+        stats_enabled: bool = False,
+        stats_category_id: int | None = None,
+        stats_channel_ids: dict = {}
     ) -> None:
         self.guild_id = guild_id
         self.owner_id = owner_id
@@ -191,6 +194,12 @@ class Guild():
         self.updated_at = updated_at
         self.is_dirty = is_dirty
         self.is_deleted = is_deleted
+
+        # TODO: Update the database to include these attributes in the table Guild
+        self.stats_enabled = stats_enabled
+        self.stats_category_id = stats_category_id
+        self.stats_channel_ids = stats_channel_ids
+        
         Guild.instance_counter += 1
 
     @classmethod
@@ -369,6 +378,39 @@ class Guild():
             self._is_deleted = value
         else:
             raise TypeError("Incorrect type for is_deleted")
+
+    @property
+    def stats_enabled(self):
+        return self._stats_enabled
+    
+    @stats_enabled.setter
+    def stats_enabled(self, value: bool):
+        if type(value) == bool:
+            self._stats_enabled = value
+        else:
+            raise TypeError("Incorrect type for stats_enabled")
+    
+    @property
+    def stats_category_id(self):
+        return self._stats_category_id
+    
+    @stats_category_id.setter
+    def stats_category_id(self, value: int | None):
+        if not value or type(value) == int:
+            self._stats_category_id = value
+        else:
+            raise TypeError("Incorrect type for stats_category_id")
+
+    @property
+    def stats_channel_ids(self):
+        return self._stats_channel_ids
+    
+    @stats_channel_ids.setter
+    def stats_channel_ids(self, value: dict):
+        if type(value) == dict:
+            self._stats_channel_ids = value
+        else:
+            raise TypeError("Incorrect type for stats_channel_ids")
 
 class UserGuildSettings():
     instance_counter = 0

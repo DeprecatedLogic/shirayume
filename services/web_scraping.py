@@ -54,9 +54,7 @@ class Cache():
         - If self.duration is 0, cache will always be updated rendering the implementation useless...
         
         """
-        if self.duration != -1 and time() - self.duration >= self.timestamp:
-            return True
-        return False
+        return self.duration != -1 and time() - self.duration >= self.timestamp
 
 
 class WebScraper():

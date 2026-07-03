@@ -3,13 +3,15 @@ from datetime import datetime
 import asyncio
 from utils import shared
 
-def embed_generator(title: str, description:str, color: tuple[int, int, int] = (255,255,255)) -> discord.Embed:
-    r,g,b = color
+def embed_generator(title: str, description:str, color: tuple[int, int, int] | discord.Color = (255,255,255)) -> discord.Embed:
+    if isinstance(color, tuple):
+        r,g,b = color
+        discord.Color.from_rgb(r,g,b)
     
     embed = discord.Embed(
         title = title, 
         description = description, 
-        color = discord.Color.from_rgb(r,g,b)
+        color = color
     )
 
     return embed

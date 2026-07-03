@@ -4,6 +4,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 from utils import shared, helpers
+import asyncio
 
 class Moderation(commands.Cog):
 
@@ -275,39 +276,77 @@ class Moderation(commands.Cog):
             )
             return await interaction.response.send_message(embed=embed, ephemeral=True)
 
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        message_followup = None
 
         try:
             channel: discord.TextChannel = interaction.channel
 
-            deleted: list[discord.Message] = []
-            async for message in channel.history(limit=1000):
-                if message.author.id == member.id:
-                    deleted.append(message)
-                    # Stop searching once we have found the amount requested
-                    if len(deleted) == amount:
-                        break
+            recent_messages: list[discord.Message] = []
+            old_messages: list[discord.Message] = []
 
-            await channel.delete_messages(deleted)
-            #deleted = await channel.purge(limit=amount, check=lambda m: m.author.id == member.id)
+            # The hard limit is 14 days
+            # We use 13 days and 23 hours to be absolutely safe
+            cutoff_datetime = discord.utils.utcnow() - datetime.timedelta(days=13, hours=23)
 
             embed = helpers.embed_generator(
-                title = "Purge",
-                description=f"Deleted {len(deleted)} messages from {member.mention}.",
+                title="Purge",
+                description=f"Searching messages from {member.mention} in this channel...",
             )
-            await interaction.followup.send(embed=embed, ephemeral=True)
+            message_followup = await interaction.followup.send(embed=embed, ephemeral=True)
+
+            async for message in channel.history(limit=None):
+                if message.author.id == member.id:
+                    
+                    # Check if it's a recent message
+                    if message.created_at >= cutoff_datetime:
+                        recent_messages.append(message)
+                    else:
+                        old_messages.append(message)
+
+                    amount -= 1
+
+                    # Stop searching once we have found the amount requested
+                    if amount <= 0:
+                        break
+
+            total_messages = len(recent_messages) + len(old_messages)
+            total_messages_deleted = total_messages
+            
+            embed = helpers.embed_generator(
+                title="Purge",
+                description=f"Deleting {total_messages} messages...",
+            )
+            await message_followup.edit(embed=embed)
+
+            # Bulk delete recent messages (fast)
+            await channel.delete_messages(recent_messages)
+            
+            # Delete old messages one by one (slower, has to respect Discord's rate-limit)
+            for message in old_messages:
+                try:
+                    await message.delete()
+                    await asyncio.sleep(0.5)
+                except discord.NotFound:
+                    total_messages_deleted -= 1
+
+            embed = helpers.embed_generator(
+                title="Purge",
+                description=f"Deleted {total_messages_deleted}/{total_messages} messages from {member.mention}.",
+            )
+            await message_followup.edit(embed=embed)
 
             moderation.add_moderation_logs(
-            mlog_id=-1,
-            guild_id=interaction.guild.id,
-            user_id=member.id,
-            moderator_id=interaction.user.id,
-            action_type=shared.Action.purge,
-            reason=f"Deleted {len(deleted)} messages in {channel.mention} from {member.mention}.",
-            action_timestamp=datetime.now(timezone.utc),
-            duration_minutes=0,
-            is_active=True,
-            pardoned=False
+                mlog_id=-1,
+                guild_id=interaction.guild.id,
+                user_id=member.id,
+                moderator_id=interaction.user.id,
+                action_type=shared.Action.purge,
+                reason=f"Deleted {total_messages_deleted}/{total_messages} messages in {channel.mention} from {member.mention}.",
+                action_timestamp=datetime.now(timezone.utc),
+                duration_minutes=0,
+                is_active=True,
+                pardoned=False
             )
 
         except discord.Forbidden:
@@ -315,14 +354,20 @@ class Moderation(commands.Cog):
                 title="Purge",
                 description="You don't have permission to purge messages in this channel.",
             )
-            await interaction.followup.send(embed=embed, ephemeral=True)
+            if message_followup:
+                await message_followup.edit(embed=embed)
+            else:
+                await interaction.followup.send(embed=embed, ephemeral=True)
 
         except Exception as e:
             embed = helpers.embed_generator(
                 title="Purge",
                 description=f"Failed to purge messages. Error: {e}",
             )
-            await interaction.followup.send(embed=embed, ephemeral=True)
+            if message_followup:
+                await message_followup.edit(embed=embed)
+            else:
+                await interaction.followup.send(embed=embed, ephemeral=True)
 
 
 async def setup():

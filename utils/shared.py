@@ -1,9 +1,10 @@
 from enum import Enum, auto
 import blessed
+from discord.ext import commands
 
 GLOBAL_CONFIG = {}
 GLOBAL_TERMINAL = blessed.Terminal()
-SHIRAYUME = None
+SHIRAYUME: commands.Bot | None = None
 
 class LogLevel(Enum):
     """ Defines logging levels with priority. """
