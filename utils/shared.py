@@ -46,6 +46,8 @@ class Table(Enum):
     user_guild_settings = auto()
     moderation_logs = auto()
     polls = auto()
+    user_economies = auto()
+    shop_items = auto()
 
 class Action(Enum):
     """ Defines actions that the discord bot can take. """

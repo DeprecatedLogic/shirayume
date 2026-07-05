@@ -1,21 +1,56 @@
-import os
-import json
 import mysql.connector
-from typing import Union, List, Dict
+import json
+from typing import Union, List, Dict, Any, Set
 from database import models
 from datetime import datetime
 from utils import shared, helpers
 
 DB_MANAGER = None 
 
+# Dynamic mapping linking Table enums directly to their model classes
+TABLE_MAP = {
+    shared.Table.users: models.User,
+    shared.Table.guilds: models.Guild,
+    shared.Table.user_guild_settings: models.UserGuildSettings,
+    shared.Table.moderation_logs: models.ModerationLog,
+    shared.Table.polls: models.Poll,
+    shared.Table.user_economies: models.UserEconomy,
+    shared.Table.shop_items: models.ShopItem,
+}
+
+# Explicit definition of primary keys to correctly handle deletions and upsert updates
+PRIMARY_KEYS = {
+    shared.Table.users: ["user_id"],
+    shared.Table.guilds: ["guild_id"],
+    shared.Table.user_guild_settings: ["user_id", "guild_id"],
+    shared.Table.moderation_logs: ["mlog_id"],
+    shared.Table.polls: ["poll_id"],
+    shared.Table.user_economies: ["guild_id", "user_id"],
+    shared.Table.shop_items: ["item_id"],
+}
+
 class DatabaseManager():
 
-    def __init__(self, DB_HOST, DB_USER, DB_PASSWORD, DATABASE) -> None:
+    def __init__(self, DB_HOST: str, DB_USER: str, DB_PASSWORD: str, DATABASE: str) -> None:
+        """
+        Initializes the DatabaseManager, establishing the connection and creating in-memory lists.
+
+        Args:
+            DB_HOST (str): Host address for the database.
+            DB_USER (str): Database username.
+            DB_PASSWORD (str): Database password.
+            DATABASE (str): Name of the database.
+        """
         self.guilds: List[models.Guild] = []
         self.users: List[models.User] = []
         self.user_guild_settings: List[models.UserGuildSettings] = []
         self.moderation_logs: List[models.ModerationLog] = []
         self.polls: List[models.Poll] = []
+        self.user_economies: List[models.UserEconomy] = []
+        self.shop_items: List[models.ShopItem] = []
+        
+        # Cache for database schemas to prevent N+1 query bottlenecks during model initialization
+        self._schema_cache: Dict[str, List[str]] = {}
 
         try:
             self.db_connection = mysql.connector.connect(
@@ -35,338 +70,388 @@ class DatabaseManager():
             )
             raise
 
-    def add_users(self, users: Union[List[models.User], models.User]):
-        if isinstance(users, models.User):
-            users = [users]
+    # --- Users ---
+    def add_users(self, users: Union[List[models.User], models.User]) -> None:
+        """
+        Adds new users to the in-memory list efficiently.
+
+        Args:
+            users (Union[List[models.User], models.User]): A single user or a list of users to add.
+        """
+        if isinstance(users, models.User): users = [users]
+        existing_ids: Set[int] = {u.user_id for u in self.users}
         for user in users:
-            if not any(u.user_id == user.user_id for u in self.users):
+            if user.user_id not in existing_ids:
                 user.is_dirty = True
                 user.is_deleted = False
                 self.users.append(user)
+                existing_ids.add(user.user_id)
 
-    def remove_users(self, user_ids: Union[List[int], int]):
-        if isinstance(user_ids, int):
-            user_ids = [user_ids]
-        for user_id in user_ids:
-            user = next((u for u in self.users if u.user_id == user_id), None)
-            if user:
+    def remove_users(self, user_ids: Union[List[int], int]) -> None:
+        """
+        Marks users as deleted in memory.
+
+        Args:
+            user_ids (Union[List[int], int]): A single user ID or list of user IDs to remove.
+        """
+        if isinstance(user_ids, int): user_ids = [user_ids]
+        id_set = set(user_ids)
+        for user in self.users:
+            if user.user_id in id_set:
                 user.is_dirty = True
                 user.is_deleted = True
 
-    def get_users_mod_logs(self, user_ids: Union[List[int], int]) -> List[models.ModerationLog]:
-        if isinstance(user_ids, int):
-            user_ids = [user_ids]
-        return [mlog for mlog in self.moderation_logs if mlog.user_id in user_ids]
-
+    # --- Guilds ---
     def add_guilds(self, guilds: Union[List[models.Guild], models.Guild]) -> None:
-        if isinstance(guilds, models.Guild):
-            guilds = [guilds]
+        """
+        Adds new guilds to the in-memory list efficiently.
+
+        Args:
+            guilds (Union[List[models.Guild], models.Guild]): A single guild or list of guilds.
+        """
+        if isinstance(guilds, models.Guild): guilds = [guilds]
+        existing_ids: Set[int] = {g.guild_id for g in self.guilds}
         for guild in guilds:
-            if not any(g.guild_id == guild.guild_id for g in self.guilds):
+            if guild.guild_id not in existing_ids:
                 guild.is_dirty = True
                 guild.is_deleted = False
                 self.guilds.append(guild)
+                existing_ids.add(guild.guild_id)
 
     def remove_guilds(self, guild_ids: Union[List[int], int]) -> None:
-        if isinstance(guild_ids, int):
-            guild_ids = [guild_ids]
-        for guild_id in guild_ids:
-            guild = next((g for g in self.guilds if g.guild_id == guild_id), None)
-            if guild:
+        """
+        Marks guilds as deleted in memory.
+
+        Args:
+            guild_ids (Union[List[int], int]): Target guild ID(s) to remove.
+        """
+        if isinstance(guild_ids, int): guild_ids = [guild_ids]
+        id_set = set(guild_ids)
+        for guild in self.guilds:
+            if guild.guild_id in id_set:
                 guild.is_dirty = True
                 guild.is_deleted = True
 
+    # --- User Guild Settings ---
     def add_user_guild_settings(self, user_guild_settings: Union[List[models.UserGuildSettings], models.UserGuildSettings]) -> None:
-        if isinstance(user_guild_settings, models.UserGuildSettings):
-            user_guild_settings = [user_guild_settings]
+        """
+        Adds user-guild settings to memory.
+
+        Args:
+            user_guild_settings (Union[List[models.UserGuildSettings], models.UserGuildSettings]): Settings to add.
+        """
+        if isinstance(user_guild_settings, models.UserGuildSettings): user_guild_settings = [user_guild_settings]
+        existing_pairs = {(ugs.user_id, ugs.guild_id) for ugs in self.user_guild_settings}
         for ug_settings in user_guild_settings:
-            if not any(ugs.user_id == ug_settings.user_id and ugs.guild_id == ug_settings.guild_id for ugs in self.user_guild_settings):
+            if (ug_settings.user_id, ug_settings.guild_id) not in existing_pairs:
                 ug_settings.is_dirty = True
                 ug_settings.is_deleted = False
                 self.user_guild_settings.append(ug_settings)
+                existing_pairs.add((ug_settings.user_id, ug_settings.guild_id))
 
     def remove_user_guild_settings(self, user_id: int, guild_id: int) -> None:
-        user_guild_settings = next((ugs for ugs in self.user_guild_settings if ugs.user_id == user_id and ugs.guild_id == guild_id), None)
-        if user_guild_settings:
-            user_guild_settings.is_dirty = True
-            user_guild_settings.is_deleted = True
+        """
+        Marks a specific user-guild setting as deleted.
+
+        Args:
+            user_id (int): ID of the user.
+            guild_id (int): ID of the guild.
+        """
+        for ugs in self.user_guild_settings:
+            if ugs.user_id == user_id and ugs.guild_id == guild_id:
+                ugs.is_dirty = True
+                ugs.is_deleted = True
+                break
 
     def link_user_to_guild(self, user_id: int, guild_id: int) -> None:
+        """
+        Updates membership status or initializes a new link between user and guild.
 
+        Args:
+            user_id (int): ID of the user.
+            guild_id (int): ID of the guild.
+        """
         for user_guild_settings in self.user_guild_settings:
             if user_guild_settings.user_id == user_id and user_guild_settings.guild_id == guild_id:
                 user_guild_settings.is_member = True
                 user_guild_settings.is_dirty = True
-                user_guild_settings.is_deleted = False # in case it was set to True
+                user_guild_settings.is_deleted = False 
                 return
 
-        # In case user_id-guild_id pair doesn't exist yet, initialize a new one
         user_guild_settings = models.UserGuildSettings(
-            user_id = user_id,
-            guild_id = guild_id,
-            joined_at = datetime.now(),
-            last_interaction = datetime.now(),
-            experience = 0,
-            level = 0,
-            custom_title = "",
-            last_xp_message = datetime.now(),
-            created_at = datetime.now(),
-            updated_at = datetime.now(),
-            is_member = True,
-            is_dirty = True,
-            is_deleted = False
+            user_id = user_id, guild_id = guild_id, joined_at = datetime.now(),
+            last_interaction = datetime.now(), experience = 0, level = 0, custom_title = "",
+            last_xp_message = datetime.now(), created_at = datetime.now(), updated_at = datetime.now(),
+            is_member = True, is_dirty = True, is_deleted = False
         )
         self.add_user_guild_settings(user_guild_settings)
 
     def unlink_user_from_guild(self, user_id: int, guild_id: int) -> None:
+        """
+        Sets a user's membership status in a guild to False.
+
+        Args:
+            user_id (int): ID of the user.
+            guild_id (int): ID of the guild.
+        """
         for user_guild_settings in self.user_guild_settings:
-            if (
-                user_guild_settings.user_id == user_id and 
-                user_guild_settings.guild_id == guild_id and 
-                user_guild_settings.is_member
-            ):
-                user_guild_settings.is_member = False # Set the member flag to False but keep user's settings in case of recovery
+            if user_guild_settings.user_id == user_id and user_guild_settings.guild_id == guild_id and user_guild_settings.is_member:
+                user_guild_settings.is_member = False 
                 user_guild_settings.is_dirty = True
-                break # user_id-guild_id is a unique pair
+                break 
+
+    # --- Moderation Logs ---
+    def get_users_mod_logs(self, user_ids: Union[List[int], int]) -> List[models.ModerationLog]:
+        """
+        Retrieves all moderation logs associated with specific user(s).
+
+        Args:
+            user_ids (Union[List[int], int]): Target user ID(s).
+
+        Returns:
+            List[models.ModerationLog]: A list of matching moderation logs.
+        """
+        if isinstance(user_ids, int): user_ids = [user_ids]
+        id_set = set(user_ids)
+        return [mlog for mlog in self.moderation_logs if mlog.user_id in id_set]
 
     def add_moderation_logs(self, moderation_logs: Union[List[models.ModerationLog], models.ModerationLog]) -> None:
-        if isinstance(moderation_logs, models.ModerationLog):
-            moderation_logs = [moderation_logs]
+        """
+        Adds moderation logs to memory.
+
+        Args:
+            moderation_logs (Union[List[models.ModerationLog], models.ModerationLog]): Logs to add.
+        """
+        if isinstance(moderation_logs, models.ModerationLog): moderation_logs = [moderation_logs]
+        existing_ids = {l.mlog_id for l in self.moderation_logs}
         for mlog in moderation_logs:
-            if not any(l.mlog_id == mlog.mlog_id for l in self.moderation_logs):
+            if mlog.mlog_id not in existing_ids:
                 mlog.is_dirty = True
                 mlog.is_deleted = False
                 self.moderation_logs.append(mlog)
+                existing_ids.add(mlog.mlog_id)
 
     def remove_moderation_logs(self, mlog_ids: Union[List[int], int]) -> None:
-        if isinstance(mlog_ids, int):
-            mlog_ids = [mlog_ids]
-        for mlog_id in mlog_ids:
-            mlog = next((l for l in self.moderation_logs if l.mlog_id == mlog_id), None)
-            if mlog:
-                self.moderation_logs.remove(mlog)
+        """
+        Marks moderation logs as deleted.
+
+        Args:
+            mlog_ids (Union[List[int], int]): Target log ID(s).
+        """
+        if isinstance(mlog_ids, int): mlog_ids = [mlog_ids]
+        id_set = set(mlog_ids)
+        for mlog in self.moderation_logs:
+            if mlog.mlog_id in id_set:
                 mlog.is_dirty = True
                 mlog.is_deleted = True
 
+    # --- Polls ---
     def add_polls(self, polls: Union[List[models.Poll], models.Poll]) -> None:
-        if isinstance(polls, models.Poll):
-            polls = [polls]
+        """
+        Adds polls to memory.
+
+        Args:
+            polls (Union[List[models.Poll], models.Poll]): Polls to add.
+        """
+        if isinstance(polls, models.Poll): polls = [polls]
+        existing_ids = {p.poll_id for p in self.polls}
         for poll in polls:
-            if poll not in self.polls:
+            if poll.poll_id not in existing_ids:
                 poll.is_dirty = True
                 poll.is_deleted = False
                 self.polls.append(poll)
+                existing_ids.add(poll.poll_id)
 
     def remove_polls(self, poll_ids: Union[List[int], int]) -> None:
-        if isinstance(poll_ids, int):
-            poll_ids = [poll_ids]
-        for poll_id in poll_ids:
-            poll = next((p for p in self.polls if p.poll_id == poll_id), None)
-            if poll:
+        """
+        Marks polls as deleted.
+
+        Args:
+            poll_ids (Union[List[int], int]): Target poll ID(s).
+        """
+        if isinstance(poll_ids, int): poll_ids = [poll_ids]
+        id_set = set(poll_ids)
+        for poll in self.polls:
+            if poll.poll_id in id_set:
                 poll.is_dirty = True
                 poll.is_deleted = True
 
-    def initialize_database_model(self, table: shared.Table, **kwargs) -> Union[models.User, models.Guild, models.UserGuildSettings, models.ModerationLog, None]:
+    # --- User Economies ---
+    def add_user_economies(self, economies: Union[List[models.UserEconomy], models.UserEconomy]) -> None:
+        """
+        Adds user economy records to memory.
+
+        Args:
+            economies (Union[List[models.UserEconomy], models.UserEconomy]): Economy records to add.
+        """
+        if isinstance(economies, models.UserEconomy): economies = [economies]
+        existing_pairs = {(e.guild_id, e.user_id) for e in self.user_economies}
+        for eco in economies:
+            if (eco.guild_id, eco.user_id) not in existing_pairs:
+                eco.is_dirty = True
+                eco.is_deleted = False
+                self.user_economies.append(eco)
+                existing_pairs.add((eco.guild_id, eco.user_id))
+
+    def remove_user_economies(self, guild_id: int, user_id: int) -> None:
+        """
+        Marks an economy record as deleted.
+
+        Args:
+            guild_id (int): Target guild ID.
+            user_id (int): Target user ID.
+        """
+        for eco in self.user_economies:
+            if eco.guild_id == guild_id and eco.user_id == user_id:
+                eco.is_dirty = True
+                eco.is_deleted = True
+                break
+
+    # --- Shop Items ---
+    def add_shop_items(self, items: Union[List[models.ShopItem], models.ShopItem]) -> None:
+        """
+        Adds shop items to memory.
+
+        Args:
+            items (Union[List[models.ShopItem], models.ShopItem]): Shop items to add.
+        """
+        if isinstance(items, models.ShopItem): items = [items]
+        existing_ids = {i.item_id for i in self.shop_items}
+        for item in items:
+            if item.item_id not in existing_ids:
+                item.is_dirty = True
+                item.is_deleted = False
+                self.shop_items.append(item)
+                existing_ids.add(item.item_id)
+
+    def remove_shop_items(self, item_ids: Union[List[int], int]) -> None:
+        """
+        Marks shop items as deleted.
+
+        Args:
+            item_ids (Union[List[int], int]): Target item ID(s).
+        """
+        if isinstance(item_ids, int): item_ids = [item_ids]
+        id_set = set(item_ids)
+        for item in self.shop_items:
+            if item.item_id in id_set:
+                item.is_dirty = True
+                item.is_deleted = True
+
+    # --- Core Logic ---
+    def initialize_database_model(self, table: shared.Table, **kwargs) -> Any:
+        """
+        Dynamically initializes a database model based on the target table.
+
+        Args:
+            table (shared.Table): The table enum mapping to the model.
+            **kwargs: Database row kwargs.
+
+        Returns:
+            Any: The initialized model object, or None if validation fails.
+        """
         try:
-            if table == shared.Table.users:
-                if all(key in kwargs for key in [
-                    "user_id",
-                    "username",
-                    "discriminator",
-                    "avatar_url",
-                    "is_bot",
-                    "currency",
-                    "created_at"
-                ]):
-                    return models.User.from_dict(kwargs)
-            elif table == shared.Table.guilds:
-                if all(key in kwargs for key in [
-                    "guild_id",
-                    "owner_id",
-                    "name",
-                    "icon_url",
-                    "member_count",
-                    "bot_count",
-                    "is_available",
-                    "welcome_channel",
-                    "leave_channel",
-                    "joined_at",
-                    "created_at"
-                ]):
-                    return models.Guild.from_dict(kwargs)
-            elif table == shared.Table.user_guild_settings:
-                if all(key in kwargs for key in [
-                    "user_id",
-                    "guild_id",
-                    "joined_at",
-                    "last_interaction",
-                    "experience",
-                    "level",
-                    "custom_title",
-                    "last_xp_message",
-                    "created_at",
-                    "is_member"
-                ]):
-                    return models.UserGuildSettings.from_dict(kwargs)
-            elif table == shared.Table.moderation_logs:
-                if all(key in kwargs for key in [
-                    "mlog_id",
-                    "guild_id",
-                    "user_id",
-                    "moderator_id",
-                    "action_type",
-                    "reason",
-                    "action_timestamp",
-                    "duration_minutes",
-                    "is_active",
-                    "pardoned"
-                ]):
-                    return models.ModerationLog.from_dict(kwargs)
-            elif table == shared.Table.polls:
-                if all(k in kwargs for k in [
-                    "poll_id",
-                    "guild_id",
-                    "creator_id",
-                    "question",
-                    "votes",
-                    "is_active",
-                    "created_at",
-                    "updated_at",
-                    "ends_at"
-                ]):
-                    return models.Poll.from_dict(kwargs)
+            if table in TABLE_MAP:
+                model_class = TABLE_MAP[table]
+                table_name = table.name
+                
+                # Cache the schema to prevent hammering the DB on every single fetch
+                if table_name not in self._schema_cache:
+                    self.db_shirayume.execute(f"DESCRIBE {table_name}")
+                    # We only strictly require fields that cannot be null, have no default, and aren't auto-incremented
+                    self._schema_cache[table_name] = [
+                        row['Field'] for row in self.db_shirayume.fetchall() 
+                        if row['Null'] == 'NO' and row['Default'] is None and 'auto_increment' not in row['Extra']
+                    ]
+                
+                required_fields = self._schema_cache[table_name]
+                
+                if all(field in kwargs for field in required_fields):
+                    return model_class.from_dict(kwargs)
+                    
             helpers.custom_print(
                 level = shared.LogLevel.ERROR,
                 function_name = "database.DatabaseManager.initialize_database_model",
-                description = f"Missing required fields for {table}"
+                description = f"Missing required fields for {table.name}"
             )
             return None
         except Exception as e:
             helpers.custom_print(
                 level = shared.LogLevel.ERROR,
                 function_name = "database.DatabaseManager.initialize_database_model",
-                description = f"Error creating model for {table}: {e}"
+                description = f"Error creating model for {table.name}: {e}"
             )
             return None
 
     def clean_flags(self) -> None:
-        for user in self.users:
-            user.is_dirty = False
-            user.is_deleted = False
-        for guild in self.guilds:
-            guild.is_dirty = False
-            guild.is_deleted = False
-        for user_guild_settings in self.user_guild_settings:
-            user_guild_settings.is_dirty = False
-            user_guild_settings.is_deleted = False
-        for mlog in self.moderation_logs:
-            mlog.is_dirty = False
-            mlog.is_deleted = False
+        """
+        Resets all is_dirty and is_deleted flags across all tracked models dynamically.
+        """
+        for table_enum in TABLE_MAP:
+            for item in getattr(self, table_enum.name):
+                item.is_dirty = False
+                item.is_deleted = False
 
     def database_commit(self) -> None:
+        """
+        Efficiently batches and executes all pending dirty state changes into the database using reflection.
+        """
         try:
-            # Commit users
-            for user in [u for u in self.users if u.is_dirty]:
-                if user.is_deleted:
-                    self.db_shirayume.execute("DELETE FROM users WHERE user_id=%s", (user.user_id,))
-                else:
-                    self.db_shirayume.execute(
-                        """
-                        INSERT INTO users (user_id, username, discriminator, avatar_url, is_bot, currency, created_at, updated_at)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                        ON DUPLICATE KEY UPDATE
-                        username=%s, discriminator=%s, avatar_url=%s, is_bot=%s, currency=%s, updated_at=%s
-                        """,
-                        (
-                            user.user_id, user.username, user.discriminator, user.avatar_url, user.is_bot, user.currency,
-                            user.created_at, user.updated_at, user.username, user.discriminator, user.avatar_url, user.is_bot,
-                            user.currency, user.updated_at
-                        )
-                    )
+            for table_enum, model_class in TABLE_MAP.items():
+                table_name = table_enum.name
+                items = getattr(self, table_name)
+                dirty_items = [item for item in items if item.is_dirty]
+                
+                if not dirty_items:
+                    continue
 
-            # Commit guilds
-            for guild in [g for g in self.guilds if g.is_dirty]:
-                if guild.is_deleted:
-                    self.db_shirayume.execute("DELETE FROM guilds WHERE guild_id=%s", (guild.guild_id,))
-                else:
-                    self.db_shirayume.execute(
-                        """
-                        INSERT INTO guilds (guild_id, owner_id, name, icon_url, member_count, bot_count, is_available, welcome_channel, leave_channel, joined_at, created_at, updated_at)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                        ON DUPLICATE KEY UPDATE
-                        owner_id=%s, name=%s, icon_url=%s, member_count=%s, bot_count=%s, is_available=%s, welcome_channel=%s, leave_channel=%s, joined_at=%s, updated_at=%s
-                        """,
-                        (
-                            guild.guild_id, guild.owner_id, guild.name, guild.icon_url, guild.member_count, guild.bot_count,
-                            guild.is_available, guild.welcome_channel, guild.leave_channel, guild.joined_at, guild.created_at, guild.updated_at,
-                            guild.owner_id, guild.name, guild.icon_url, guild.member_count, guild.bot_count, guild.is_available,
-                            guild.welcome_channel, guild.joined_at, guild.updated_at
-                        )
-                    )
+                pkeys = PRIMARY_KEYS[table_enum]
 
-            # Commit user_guild_settings
-            for user_guild_settings in [ugs for ugs in self.user_guild_settings if ugs.is_dirty]:
-                if user_guild_settings.is_deleted:
-                    self.db_shirayume.execute(
-                        "DELETE FROM user_guild_settings WHERE user_id=%s AND guild_id=%s",
-                        (user_guild_settings.user_id, user_guild_settings.guild_id)
-                    )
-                else:
-                    self.db_shirayume.execute(
-                        """
-                        INSERT INTO user_guild_settings (user_id, guild_id, joined_at, last_interaction, experience, level, custom_title, last_xp_message, created_at, updated_at, is_member)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                        ON DUPLICATE KEY UPDATE
-                        joined_at=%s, last_interaction=%s, experience=%s, level=%s, custom_title=%s, last_xp_message=%s, updated_at=%s, is_member=%s
-                        """,
-                        (
-                            user_guild_settings.user_id, user_guild_settings.guild_id, user_guild_settings.joined_at, user_guild_settings.last_interaction, user_guild_settings.experience,
-                            user_guild_settings.level, user_guild_settings.custom_title, user_guild_settings.last_xp_message, user_guild_settings.created_at, user_guild_settings.updated_at,
-                            user_guild_settings.is_member, user_guild_settings.joined_at, user_guild_settings.last_interaction, user_guild_settings.experience, user_guild_settings.level,
-                            user_guild_settings.custom_title, user_guild_settings.last_xp_message, user_guild_settings.updated_at, user_guild_settings.is_member
-                        )
-                    )
+                # Batch Deletions
+                deleted_items = [item for item in dirty_items if item.is_deleted]
+                if deleted_items:
+                    where_clause = " AND ".join([f"{pk}=%s" for pk in pkeys])
+                    delete_sql = f"DELETE FROM {table_name} WHERE {where_clause}"
+                    delete_data = [tuple(getattr(item, pk) for pk in pkeys) for item in deleted_items]
+                    self.db_shirayume.executemany(delete_sql, delete_data)
 
-            # Commit moderation_logs
-            for mlog in [l for l in self.moderation_logs if l.is_dirty]:
-                if mlog.is_deleted:
-                    self.db_shirayume.execute("DELETE FROM moderation_logs WHERE mlog_id=%s", (mlog.mlog_id,))
-                else:
-                    self.db_shirayume.execute(
-                        """
-                        INSERT INTO moderation_logs (mlog_id, guild_id, user_id, moderator_id, action_type, reason, action_timestamp, duration_minutes, is_active, pardoned)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                        ON DUPLICATE KEY UPDATE
-                        guild_id=%s, user_id=%s, moderator_id=%s, action_type=%s, reason=%s, action_timestamp=%s, duration_minutes=%s, is_active=%s, pardoned=%s
-                        """,
-                        (
-                            mlog.mlog_id, mlog.guild_id, mlog.user_id, mlog.moderator_id, mlog.action_type.name, mlog.reason,
-                            mlog.action_timestamp, mlog.duration_minutes, mlog.is_active, mlog.pardoned,
-                            mlog.guild_id, mlog.user_id, mlog.moderator_id, mlog.action_type.name, mlog.reason,
-                            mlog.action_timestamp, mlog.duration_minutes, mlog.is_active, mlog.pardoned
-                        )
-                    )
+                # Batch Insertions/Updates (Upsert)
+                upsert_items = [item for item in dirty_items if not item.is_deleted]
+                if upsert_items:
+                    # Introspect actual DB columns dynamically just once per table commit
+                    self.db_shirayume.execute(f"DESCRIBE {table_name}")
+                    columns = [row['Field'] for row in self.db_shirayume.fetchall()]
 
-            for poll in [p for p in self.polls if p.is_dirty]:
-                if poll.is_deleted:
-                    self.db_shirayume.execute("DELETE FROM polls WHERE poll_id=%s", (poll.poll_id,))
-                else:
-                    self.db_shirayume.execute(
-                        """
-                        INSERT INTO polls (poll_id, guild_id, creator_id, question, votes, is_active, created_at, updated_at, ends_at)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                        ON DUPLICATE KEY UPDATE
-                        guild_id=%s, creator_id=%s, question=%s, votes=%s, is_active=%s, updated_at=%s
-                        """,
-                        (
-                            poll.poll_id, poll.guild_id, poll.creator_id, poll.question, json.dumps(poll.votes),
-                            poll.is_active, poll.created_at, poll.updated_at, poll.ends_at, poll.guild_id, poll.creator_id,
-                            poll.question, json.dumps(poll.votes), poll.is_active, poll.updated_at
-                        )
-                    )
+                    placeholders = ", ".join(["%s"] * len(columns))
+                    col_str = ", ".join(columns)
+                    
+                    # Uses VALUES() which safely updates duplicate keys efficiently in standard MySQL connectors
+                    update_str = ", ".join([f"{col}=VALUES({col})" for col in columns if col not in pkeys])
+
+                    upsert_sql = f"""
+                        INSERT INTO {table_name} ({col_str})
+                        VALUES ({placeholders})
+                        ON DUPLICATE KEY UPDATE {update_str}
+                    """
+
+                    upsert_data = []
+                    for item in upsert_items:
+                        row_values = []
+                        for col in columns:
+                            val = getattr(item, col)
+                            # Handle serialization variations smoothly via reflection
+                            if isinstance(val, shared.Action):
+                                val = val.name
+                            elif isinstance(val, (dict, list)):
+                                val = json.dumps(val)
+                            row_values.append(val)
+                        upsert_data.append(tuple(row_values))
+
+                    self.db_shirayume.executemany(upsert_sql, upsert_data)
 
             self.db_connection.commit()
             self.clean_flags()
+            
         except mysql.connector.Error as e:
             helpers.custom_print(
                 level = shared.LogLevel.ERROR,
@@ -376,8 +461,11 @@ class DatabaseManager():
             raise
 
     def database_close(self) -> None:
+        """
+        Commits pending changes and gracefully closes the database connection.
+        """
         try:
-            self.database_commit()  # Commit any remaining dirty objects
+            self.database_commit()  
             self.db_shirayume.close()
             self.db_connection.close()
         except mysql.connector.Error as e:
@@ -388,7 +476,16 @@ class DatabaseManager():
             )
             raise
 
-def setup(DB_HOST, DB_USER, DB_PASSWORD, DATABASE):
+def setup(DB_HOST: str, DB_USER: str, DB_PASSWORD: str, DATABASE: str) -> None:
+    """
+    Initializes the global DB_MANAGER and dynamically loads all tables.
+
+    Args:
+        DB_HOST (str): Host address.
+        DB_USER (str): Db user.
+        DB_PASSWORD (str): Db password.
+        DATABASE (str): Target database.
+    """
     helpers.custom_print(
         level = shared.LogLevel.INFO,
         function_name = "database.DatabaseManager.setup",
@@ -402,106 +499,31 @@ def setup(DB_HOST, DB_USER, DB_PASSWORD, DATABASE):
         description = f"DB_MANAGER initialized ({DB_MANAGER})"
     )
     try:
-        helpers.custom_print(
-            level = shared.LogLevel.DEBUG,
-            function_name = "database.DatabaseManager.setup",
-            description = f"Importing users from DB..."
-        )
-        DB_MANAGER.db_shirayume.execute(f"SELECT * FROM {shared.Table.users.name}")
-        users = []
-        while True:
-            user = DB_MANAGER.db_shirayume.fetchone()
-            if not user:
-                break
-            model = DB_MANAGER.initialize_database_model(shared.Table.users, **user)
-            if model:
-                users.append(model)
-        DB_MANAGER.add_users(users)
-        helpers.custom_print(
-            level = shared.LogLevel.DEBUG,
-            function_name = "database.DatabaseManager.setup",
-            description = f"DB users imported"
-        )
-
-        helpers.custom_print(
-            level = shared.LogLevel.DEBUG,
-            function_name = "database.DatabaseManager.setup",
-            description = f"Importing guilds from DB..."
-        )
-        DB_MANAGER.db_shirayume.execute(f"SELECT * FROM {shared.Table.guilds.name}")
-        guilds = []
-        while True:
-            guild = DB_MANAGER.db_shirayume.fetchone()
-            if not guild:
-                break
-            model = DB_MANAGER.initialize_database_model(shared.Table.guilds, **guild)
-            guilds.append(model)
-        DB_MANAGER.add_guilds(guilds)
-        helpers.custom_print(
-            level = shared.LogLevel.DEBUG,
-            function_name = "database.DatabaseManager.setup",
-            description = f"DB guilds imported"
-        )
-
-        helpers.custom_print(
-            level = shared.LogLevel.DEBUG,
-            function_name = "database.DatabaseManager.setup",
-            description = f"Importing user-guild settings from DB..."
-        )
-        DB_MANAGER.db_shirayume.execute(f"SELECT * FROM {shared.Table.user_guild_settings.name}")
-        user_guild_settings = []
-        while True:
-            ug_settings = DB_MANAGER.db_shirayume.fetchone()
-            if not ug_settings:
-                break
-            model = DB_MANAGER.initialize_database_model(shared.Table.user_guild_settings, **ug_settings)
-            user_guild_settings.append(model)
-        DB_MANAGER.add_user_guild_settings(user_guild_settings)
-        helpers.custom_print(
-            level = shared.LogLevel.DEBUG,
-            function_name = "database.DatabaseManager.setup",
-            description = f"DB user-guild settings imported"
-        )
-
-        helpers.custom_print(
-            level = shared.LogLevel.DEBUG,
-            function_name = "database.DatabaseManager.setup",
-            description = f"Importing moderation logs from DB..."
-        )
-        DB_MANAGER.db_shirayume.execute(f"SELECT * FROM {shared.Table.moderation_logs.name}")
-        moderation_logs = []
-        while True:
-            moderation_log = DB_MANAGER.db_shirayume.fetchone()
-            if not moderation_log:
-                break
-            model = DB_MANAGER.initialize_database_model(shared.Table.moderation_logs, **moderation_log)
-            moderation_logs.append(model)
-        DB_MANAGER.add_moderation_logs(moderation_logs)
-        helpers.custom_print(
-            level = shared.LogLevel.DEBUG,
-            function_name = "database.DatabaseManager.setup",
-            description = f"DB moderation logs imported"
-        )
-
-        helpers.custom_print(
-            level = shared.LogLevel.DEBUG,
-            function_name = "database.DatabaseManager.setup",
-            description = f"Importing polls from DB..."
-        )
-        DB_MANAGER.db_shirayume.execute(f"SELECT * FROM {shared.Table.polls.name}")
-        polls = []
-        while True:
-            poll = DB_MANAGER.db_shirayume.fetchone()
-            if not poll:
-                break
-            model = DB_MANAGER.initialize_database_model(shared.Table.polls, **poll)
-            polls.append(model)
-        DB_MANAGER.add_polls(polls)
-        helpers.custom_print(
-            level = shared.LogLevel.DEBUG,
-            function_name = "database.DatabaseManager.setup",
-            description = f"DB polls imported"
-        )
+        for table_enum in TABLE_MAP:
+            table_name = table_enum.name
+            helpers.custom_print(
+                level = shared.LogLevel.DEBUG,
+                function_name = "database.DatabaseManager.setup",
+                description = f"Importing {table_name} from DB..."
+            )
+            
+            DB_MANAGER.db_shirayume.execute(f"SELECT * FROM {table_name}")
+            rows = DB_MANAGER.db_shirayume.fetchall()
+            
+            models_list = []
+            for row in rows:
+                model = DB_MANAGER.initialize_database_model(table_enum, **row)
+                if model:
+                    models_list.append(model)
+            
+            # Use reflection to invoke the respective add call dynamically
+            getattr(DB_MANAGER, f"add_{table_name}")(models_list)
+            
+            helpers.custom_print(
+                level = shared.LogLevel.DEBUG,
+                function_name = "database.DatabaseManager.setup",
+                description = f"DB {table_name} imported"
+            )
 
         helpers.custom_print(
             level = shared.LogLevel.INFO,
