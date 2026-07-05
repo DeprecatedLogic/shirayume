@@ -1,6 +1,7 @@
 from enum import Enum, auto
 import blessed
 from discord.ext import commands
+from dataclasses import dataclass
 
 GLOBAL_CONFIG = {}
 GLOBAL_TERMINAL = blessed.Terminal()
@@ -94,3 +95,10 @@ class SupportedWebsites(Enum):
 
     def __str__(self):
         return self.value
+    
+@dataclass
+class MessageDTO:
+    channel_id: int
+    author: str
+    role: str
+    content: str
