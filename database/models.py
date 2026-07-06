@@ -49,10 +49,10 @@ class User():
             return cls(
                 user_id = data["user_id"],
                 username = data["username"],
-                discriminator = data["discriminator"],
-                avatar_url = data["avatar_url"],
+                discriminator = data.get("discriminator", ""),
+                avatar_url = data.get("avatar_url", ""),
                 is_bot = bool(data["is_bot"]),
-                balance = data["balance"],
+                balance = data.get("balance", 0),
                 created_at = data["created_at"],
                 updated_at = data.get("updated_at", data["created_at"]),
                 is_dirty = bool(data.get("is_dirty", False)),
@@ -235,7 +235,7 @@ class Guild():
                 is_deleted = bool(data.get("is_deleted", False)),
                 stats_enabled = bool(data.get("stats_enabled", False)),
                 stats_category_id = data.get("stats_category_id", None),
-                stats_channel_ids = json.loads(data["stats_channel_ids"]) if isinstance(data.get("stats_channel_ids"), str) else data.get("stats_channel_ids", {}),
+                stats_channel_ids = data.get("stats_channel_ids", {}),
                 economy_enabled = bool(data.get("economy_enabled", False)),
                 base_message_reward = data.get("base_message_reward", 0),
                 currency = data.get("currency", "Credits")
@@ -463,8 +463,8 @@ class UserGuildSettings():
                 last_interaction = data["last_interaction"],
                 experience = data["experience"],
                 level = data["level"],
-                custom_title = data["custom_title"],
-                last_xp_message = data["last_xp_message"],
+                custom_title = data.get("custom_title", ""),
+                last_xp_message = data.get("last_xp_message", None),
                 created_at = data["created_at"],
                 updated_at = data.get("updated_at", data["created_at"]),
                 is_member = bool(data["is_member"]),
@@ -644,7 +644,7 @@ class ModerationLog():
                 action_type = action_value,
                 reason = data["reason"],
                 action_timestamp = data["action_timestamp"],
-                duration_minutes = data["duration_minutes"],
+                duration_minutes = data.get("duration_minutes", None), # maybe 0 instead of None ?
                 is_active = bool(data["is_active"]),
                 pardoned = bool(data["pardoned"]),
                 is_dirty = bool(data.get("is_dirty", False)),
@@ -957,7 +957,7 @@ class UserEconomy():
                 guild_id = data["guild_id"],
                 user_id = data["user_id"],
                 local_balance = data["local_balance"],
-                last_message_reward_time = data["last_message_reward_time"],
+                last_message_reward_time = data.get("last_message_reward_time", None),
                 is_dirty = bool(data.get("is_dirty", False)),
                 is_deleted = bool(data.get("is_deleted", False))
             )

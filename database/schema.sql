@@ -16,7 +16,7 @@ CREATE TABLE users (
     discriminator VARCHAR(4) NULL,
     avatar_url VARCHAR(2048) NULL,
     is_bot BOOLEAN DEFAULT FALSE NOT NULL,
-    currency BIGINT DEFAULT 0 NOT NULL,
+    balance BIGINT DEFAULT 0 NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP() NOT NULL,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP()
         ON UPDATE CURRENT_TIMESTAMP()
@@ -31,6 +31,12 @@ CREATE TABLE guilds (
     member_count INT NOT NULL,
     bot_count INT NOT NULL,
     is_available BOOLEAN NOT NULL,
+    economy_enabled BOOLEAN DEFAULT FALSE NOT NULL,
+    stats_enabled BOOLEAN DEFAULT FALSE NOT NULL,
+    stats_category_id BIGINT NULL,
+    stats_channel_ids JSON NULL,
+    base_message_reward INT DEFAULT 0 NOT NULL,
+    currency VARCHAR(255) DEFAULT "Credits" NOT NULL,
     welcome_channel BIGINT NULL,
     leave_channel BIGINT NULL,
     joined_at DATETIME DEFAULT CURRENT_TIMESTAMP() NOT NULL,
@@ -79,8 +85,8 @@ CREATE TABLE moderation_logs (
     reason TEXT NULL,
     action_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP() NOT NULL,
     duration_minutes INT NULL,
-    is_active BOOLEAN DEFAULT TRUE,
-    pardoned BOOLEAN DEFAULT FALSE,
+    is_active BOOLEAN DEFAULT TRUE NOT NULL,
+    pardoned BOOLEAN DEFAULT FALSE NOT NULL,
     CONSTRAINT fk_moderation_logs_guildid_guilds_guildid
         FOREIGN KEY (guild_id) REFERENCES guilds(guild_id),
     CONSTRAINT fk_moderation_logs_userid_users_userid
@@ -95,7 +101,7 @@ CREATE TABLE polls (
     creator_id BIGINT NOT NULL,
     question VARCHAR(255) NOT NULL,
     votes JSON NOT NULL,
-    is_active BOOLEAN DEFAULT TRUE,
+    is_active BOOLEAN DEFAULT TRUE NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP() NOT NULL,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP()
         ON UPDATE CURRENT_TIMESTAMP()
@@ -105,4 +111,27 @@ CREATE TABLE polls (
         FOREIGN KEY (guild_id) REFERENCES guilds(guild_id),
     CONSTRAINT fk_polls_creatorid_users_userid
         FOREIGN KEY (creator_id) REFERENCES users(user_id)
+);
+
+CREATE TABLE user_economies (
+    guild_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    local_balance BIGINT DEFAULT 0 NOT NULL,
+    last_message_reward_time DATETIME NULL,
+    PRIMARY KEY (guild_id, user_id),
+    CONSTRAINT fk_usereconomy_guildid_guilds_guildid
+        FOREIGN KEY (guild_id) REFERENCES guilds(guild_id),
+	CONSTRAINT fk_usereconomy_userid_users_userid
+        FOREIGN KEY (user_id) REFERENCES users(user_id)
+);
+
+CREATE TABLE shop_items (
+    item_id BIGINT PRIMARY KEY,
+    guild_id BIGINT NOT NULL,
+    name VARCHAR(64) NOT NULL,
+    description VARCHAR(255) NOT NULL,
+    price INT DEFAULT 0 NOT NULL,
+    role_id BIGINT NULL,
+    CONSTRAINT fk_shopitem_guildid_guilds_guildid
+        FOREIGN KEY (guild_id) REFERENCES guilds(guild_id)
 );
