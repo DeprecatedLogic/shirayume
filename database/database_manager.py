@@ -29,7 +29,7 @@ PRIMARY_KEYS = {
     shared.Table.shop_items: ["item_id"],
 }
 
-class DatabaseManager():
+class DatabaseManager:
 
     def __init__(self, DB_HOST: str, DB_USER: str, DB_PASSWORD: str, DATABASE: str) -> None:
         """
@@ -41,36 +41,182 @@ class DatabaseManager():
             DB_PASSWORD (str): Database password.
             DATABASE (str): Name of the database.
         """
-        self.guilds: List[models.Guild] = []
-        self.users: List[models.User] = []
-        self.user_guild_settings: List[models.UserGuildSettings] = []
-        self.moderation_logs: List[models.ModerationLog] = []
-        self.polls: List[models.Poll] = []
-        self.user_economies: List[models.UserEconomy] = []
-        self.shop_items: List[models.ShopItem] = []
-        
-        # Cache for database schemas to prevent N+1 query bottlenecks during model initialization
-        self._schema_cache: Dict[str, List[str]] = {}
+        self.users = []
+        self.guilds = []
+        self.user_guild_settings = []
+        self.moderation_logs = []
+        self.polls = []
+        self.user_economies = []
+        self.shop_items = []
+
+        # O(1) lookup indices
+        self._index = {
+            table: {}
+            for table in TABLE_MAP
+        }
+
+        # Dirty tracking
+        self._dirty = {
+            table:set()
+            for table in TABLE_MAP
+        }
+
+        # Schema cache
+        self._schema_cache = {}
+
+        # SQL cache
+        self._sql_cache = {}
 
         try:
             self.db_connection = mysql.connector.connect(
-                host = DB_HOST,
-                user = DB_USER,
-                password = DB_PASSWORD,
-                database = DATABASE,
-                use_pure = True
+                host=DB_HOST,
+                user=DB_USER,
+                password=DB_PASSWORD,
+                database=DATABASE,
+                use_pure=True
             )
-            self.db_shirayume = self.db_connection.cursor(dictionary=True)
+
+            self.db_shirayume = self.db_connection.cursor(
+                dictionary=True
+            )
+
+            self._initialize_schema()
 
         except mysql.connector.Error as e:
+
             helpers.custom_print(
-                level = shared.LogLevel.CRITICAL,
-                function_name = "database.DatabaseManager.__init__",
-                description = f"Failed to connect to the database: {e}"
+                level=shared.LogLevel.CRITICAL,
+                function_name="database.DatabaseManager.__init__",
+                description=f"Failed to connect: {e}"
             )
+
             raise
 
-    # --- Users ---
+    def _key(self, table, obj):
+        """_summary_
+
+        Args:
+            table (_type_): _description_
+            obj (_type_): _description_
+
+        Returns:
+            _type_: _description_
+        """
+        pkeys = PRIMARY_KEYS[table]
+
+        if len(pkeys) == 1:
+            return getattr(obj, pkeys[0])
+
+        return tuple(getattr(obj,pk) for pk in pkeys)
+
+    def _mark_dirty(self, table, obj) -> None:
+        """_summary_
+
+        Args:
+            table (_type_): _description_
+            obj (_type_): _description_
+        """
+        obj.is_dirty = True
+        self._dirty[table].add(obj)
+
+    def _add(self, table, items, mark_dirty: bool = True) -> None:
+        """_summary_
+
+        Args:
+            table (_type_): _description_
+            items (_type_): _description_
+            mark_dirty (bool): _description_
+        """
+        if not isinstance(items, list):
+            items = [items]
+
+        storage = getattr(self, table.name)
+        index = self._index[table]
+
+        for item in items:
+            key = self._key(table, item)
+
+            if key in index:
+                continue
+
+            item.is_deleted = False
+            storage.append(item)
+            index[key] = item
+
+            if mark_dirty:
+                self._mark_dirty(table, item)
+
+    def _remove(self, table, key) -> None:
+        """_summary_
+
+        Args:
+            table (_type_): _description_
+            key (_type_): _description_
+        """
+        obj = self._index[table].get(key)
+
+        if obj:
+            obj.is_deleted = True
+            self._mark_dirty(table, obj)
+
+    def _initialize_schema(self) -> None:
+        for table in TABLE_MAP:
+
+            table_name = table.name
+            self.db_shirayume.execute(f"DESCRIBE {table_name}")
+            
+            rows = self.db_shirayume.fetchall()
+            columns = [r["Field"] for r in rows]
+
+            required = [
+                r["Field"]
+                for r in rows
+                if (
+                    r["Null"]=="NO"
+                    and r["Default"] is None
+                    and "auto_increment"
+                    not in r["Extra"]
+                )
+            ]
+
+            self._schema_cache[table_name]={
+                "columns":columns,
+                "required":required
+            }
+
+            pkeys = PRIMARY_KEYS[table]
+
+            placeholders = ", ".join(["%s"]*len(columns))
+            col_str = ", ".join(columns)
+
+            update_str = ", ".join(
+                f"{c}=VALUES({c})"
+                for c in columns
+                if c not in pkeys
+            )
+
+            delete_where = " AND ".join(f"{pk}=%s" for pk in pkeys)
+
+            self._sql_cache[table_name]={
+                "delete":
+                f"""
+                DELETE FROM {table_name}
+                WHERE {delete_where}
+                """,
+
+                "upsert":
+                f"""
+                INSERT INTO {table_name}
+                ({col_str})
+
+                VALUES ({placeholders})
+
+                ON DUPLICATE KEY UPDATE
+                {update_str}
+                """
+            }
+
+
     def add_users(self, users: Union[List[models.User], models.User]) -> None:
         """
         Adds new users to the in-memory list efficiently.
@@ -78,14 +224,7 @@ class DatabaseManager():
         Args:
             users (Union[List[models.User], models.User]): A single user or a list of users to add.
         """
-        if isinstance(users, models.User): users = [users]
-        existing_ids: Set[int] = {u.user_id for u in self.users}
-        for user in users:
-            if user.user_id not in existing_ids:
-                user.is_dirty = True
-                user.is_deleted = False
-                self.users.append(user)
-                existing_ids.add(user.user_id)
+        self._add(shared.Table.users, users)
 
     def remove_users(self, user_ids: Union[List[int], int]) -> None:
         """
@@ -94,14 +233,13 @@ class DatabaseManager():
         Args:
             user_ids (Union[List[int], int]): A single user ID or list of user IDs to remove.
         """
-        if isinstance(user_ids, int): user_ids = [user_ids]
-        id_set = set(user_ids)
-        for user in self.users:
-            if user.user_id in id_set:
-                user.is_dirty = True
-                user.is_deleted = True
+        if isinstance(user_ids, int):
+            user_ids = [user_ids]
 
-    # --- Guilds ---
+        for user_id in user_ids:
+            self._remove(shared.Table.users, user_id)
+
+
     def add_guilds(self, guilds: Union[List[models.Guild], models.Guild]) -> None:
         """
         Adds new guilds to the in-memory list efficiently.
@@ -109,14 +247,7 @@ class DatabaseManager():
         Args:
             guilds (Union[List[models.Guild], models.Guild]): A single guild or list of guilds.
         """
-        if isinstance(guilds, models.Guild): guilds = [guilds]
-        existing_ids: Set[int] = {g.guild_id for g in self.guilds}
-        for guild in guilds:
-            if guild.guild_id not in existing_ids:
-                guild.is_dirty = True
-                guild.is_deleted = False
-                self.guilds.append(guild)
-                existing_ids.add(guild.guild_id)
+        self._add(shared.Table.guilds, guilds)
 
     def remove_guilds(self, guild_ids: Union[List[int], int]) -> None:
         """
@@ -125,14 +256,13 @@ class DatabaseManager():
         Args:
             guild_ids (Union[List[int], int]): Target guild ID(s) to remove.
         """
-        if isinstance(guild_ids, int): guild_ids = [guild_ids]
-        id_set = set(guild_ids)
-        for guild in self.guilds:
-            if guild.guild_id in id_set:
-                guild.is_dirty = True
-                guild.is_deleted = True
+        if isinstance(guild_ids, int):
+            guild_ids = [guild_ids]
+        
+        for guild_id in guild_ids:
+            self._remove(shared.Table.guilds, guild_id)
 
-    # --- User Guild Settings ---
+
     def add_user_guild_settings(self, user_guild_settings: Union[List[models.UserGuildSettings], models.UserGuildSettings]) -> None:
         """
         Adds user-guild settings to memory.
@@ -140,14 +270,7 @@ class DatabaseManager():
         Args:
             user_guild_settings (Union[List[models.UserGuildSettings], models.UserGuildSettings]): Settings to add.
         """
-        if isinstance(user_guild_settings, models.UserGuildSettings): user_guild_settings = [user_guild_settings]
-        existing_pairs = {(ugs.user_id, ugs.guild_id) for ugs in self.user_guild_settings}
-        for ug_settings in user_guild_settings:
-            if (ug_settings.user_id, ug_settings.guild_id) not in existing_pairs:
-                ug_settings.is_dirty = True
-                ug_settings.is_deleted = False
-                self.user_guild_settings.append(ug_settings)
-                existing_pairs.add((ug_settings.user_id, ug_settings.guild_id))
+        self._add(shared.Table.user_guild_settings, user_guild_settings)
 
     def remove_user_guild_settings(self, user_id: int, guild_id: int) -> None:
         """
@@ -157,11 +280,7 @@ class DatabaseManager():
             user_id (int): ID of the user.
             guild_id (int): ID of the guild.
         """
-        for ugs in self.user_guild_settings:
-            if ugs.user_id == user_id and ugs.guild_id == guild_id:
-                ugs.is_dirty = True
-                ugs.is_deleted = True
-                break
+        self._remove(shared.Table.user_guild_settings, (user_id, guild_id))
 
     def link_user_to_guild(self, user_id: int, guild_id: int) -> None:
         """
@@ -171,20 +290,22 @@ class DatabaseManager():
             user_id (int): ID of the user.
             guild_id (int): ID of the guild.
         """
-        for user_guild_settings in self.user_guild_settings:
-            if user_guild_settings.user_id == user_id and user_guild_settings.guild_id == guild_id:
-                user_guild_settings.is_member = True
-                user_guild_settings.is_dirty = True
-                user_guild_settings.is_deleted = False 
-                return
+        ugs = self._index[shared.Table.user_guild_settings].get((user_id, guild_id))
 
-        user_guild_settings = models.UserGuildSettings(
-            user_id = user_id, guild_id = guild_id, joined_at = datetime.now(),
-            last_interaction = datetime.now(), experience = 0, level = 0, custom_title = "",
-            last_xp_message = datetime.now(), created_at = datetime.now(), updated_at = datetime.now(),
-            is_member = True, is_dirty = True, is_deleted = False
+        if ugs:
+            ugs.is_member = True
+            ugs.is_deleted = False # just in case (normally we do NOT delete links between users and guilds to keep their old data intact)
+            self._mark_dirty(shared.Table.user_guild_settings, ugs)
+            return
+        
+        self.add_user_guild_settings(
+            models.UserGuildSettings(
+                user_id = user_id, guild_id = guild_id, joined_at = datetime.now(),
+                last_interaction = datetime.now(), experience = 0, level = 0, custom_title = "",
+                last_xp_message = datetime.now(), created_at = datetime.now(), updated_at = datetime.now(),
+                is_member = True, is_dirty = True, is_deleted = False
+            )
         )
-        self.add_user_guild_settings(user_guild_settings)
 
     def unlink_user_from_guild(self, user_id: int, guild_id: int) -> None:
         """
@@ -194,13 +315,13 @@ class DatabaseManager():
             user_id (int): ID of the user.
             guild_id (int): ID of the guild.
         """
-        for user_guild_settings in self.user_guild_settings:
-            if user_guild_settings.user_id == user_id and user_guild_settings.guild_id == guild_id and user_guild_settings.is_member:
-                user_guild_settings.is_member = False 
-                user_guild_settings.is_dirty = True
-                break 
+        ugs = self._index[shared.Table.user_guild_settings].get((user_id, guild_id))
 
-    # --- Moderation Logs ---
+        if ugs and ugs.is_member:
+            ugs.is_member = False
+            self._mark_dirty(shared.Table.user_guild_settings, ugs)
+
+
     def get_users_mod_logs(self, user_ids: Union[List[int], int]) -> List[models.ModerationLog]:
         """
         Retrieves all moderation logs associated with specific user(s).
@@ -222,14 +343,7 @@ class DatabaseManager():
         Args:
             moderation_logs (Union[List[models.ModerationLog], models.ModerationLog]): Logs to add.
         """
-        if isinstance(moderation_logs, models.ModerationLog): moderation_logs = [moderation_logs]
-        existing_ids = {l.mlog_id for l in self.moderation_logs}
-        for mlog in moderation_logs:
-            if mlog.mlog_id not in existing_ids:
-                mlog.is_dirty = True
-                mlog.is_deleted = False
-                self.moderation_logs.append(mlog)
-                existing_ids.add(mlog.mlog_id)
+        self._add(shared.Table.moderation_logs, moderation_logs)
 
     def remove_moderation_logs(self, mlog_ids: Union[List[int], int]) -> None:
         """
@@ -238,14 +352,13 @@ class DatabaseManager():
         Args:
             mlog_ids (Union[List[int], int]): Target log ID(s).
         """
-        if isinstance(mlog_ids, int): mlog_ids = [mlog_ids]
-        id_set = set(mlog_ids)
-        for mlog in self.moderation_logs:
-            if mlog.mlog_id in id_set:
-                mlog.is_dirty = True
-                mlog.is_deleted = True
+        if isinstance(mlog_ids, int):
+            mlog_ids = [mlog_ids]
 
-    # --- Polls ---
+        for mlog_id in mlog_ids:
+            self._remove(shared.Table.moderation_logs, mlog_id)
+
+
     def add_polls(self, polls: Union[List[models.Poll], models.Poll]) -> None:
         """
         Adds polls to memory.
@@ -253,14 +366,7 @@ class DatabaseManager():
         Args:
             polls (Union[List[models.Poll], models.Poll]): Polls to add.
         """
-        if isinstance(polls, models.Poll): polls = [polls]
-        existing_ids = {p.poll_id for p in self.polls}
-        for poll in polls:
-            if poll.poll_id not in existing_ids:
-                poll.is_dirty = True
-                poll.is_deleted = False
-                self.polls.append(poll)
-                existing_ids.add(poll.poll_id)
+        self._add(shared.Table.polls, polls)
 
     def remove_polls(self, poll_ids: Union[List[int], int]) -> None:
         """
@@ -269,14 +375,13 @@ class DatabaseManager():
         Args:
             poll_ids (Union[List[int], int]): Target poll ID(s).
         """
-        if isinstance(poll_ids, int): poll_ids = [poll_ids]
-        id_set = set(poll_ids)
-        for poll in self.polls:
-            if poll.poll_id in id_set:
-                poll.is_dirty = True
-                poll.is_deleted = True
+        if isinstance(poll_ids, int):
+            poll_ids = [poll_ids]
 
-    # --- User Economies ---
+        for poll_id in poll_ids:
+            self._remove(shared.Table.polls, poll_id)
+
+
     def add_user_economies(self, economies: Union[List[models.UserEconomy], models.UserEconomy]) -> None:
         """
         Adds user economy records to memory.
@@ -284,14 +389,7 @@ class DatabaseManager():
         Args:
             economies (Union[List[models.UserEconomy], models.UserEconomy]): Economy records to add.
         """
-        if isinstance(economies, models.UserEconomy): economies = [economies]
-        existing_pairs = {(e.guild_id, e.user_id) for e in self.user_economies}
-        for eco in economies:
-            if (eco.guild_id, eco.user_id) not in existing_pairs:
-                eco.is_dirty = True
-                eco.is_deleted = False
-                self.user_economies.append(eco)
-                existing_pairs.add((eco.guild_id, eco.user_id))
+        self._add(shared.Table.user_economies, economies)
 
     def remove_user_economies(self, guild_id: int, user_id: int) -> None:
         """
@@ -301,13 +399,9 @@ class DatabaseManager():
             guild_id (int): Target guild ID.
             user_id (int): Target user ID.
         """
-        for eco in self.user_economies:
-            if eco.guild_id == guild_id and eco.user_id == user_id:
-                eco.is_dirty = True
-                eco.is_deleted = True
-                break
+        self._remove(shared.Table.user_economies, (guild_id, user_id))
 
-    # --- Shop Items ---
+
     def add_shop_items(self, items: Union[List[models.ShopItem], models.ShopItem]) -> None:
         """
         Adds shop items to memory.
@@ -315,14 +409,7 @@ class DatabaseManager():
         Args:
             items (Union[List[models.ShopItem], models.ShopItem]): Shop items to add.
         """
-        if isinstance(items, models.ShopItem): items = [items]
-        existing_ids = {i.item_id for i in self.shop_items}
-        for item in items:
-            if item.item_id not in existing_ids:
-                item.is_dirty = True
-                item.is_deleted = False
-                self.shop_items.append(item)
-                existing_ids.add(item.item_id)
+        self._add(shared.Table.shop_items, items)
 
     def remove_shop_items(self, item_ids: Union[List[int], int]) -> None:
         """
@@ -331,14 +418,13 @@ class DatabaseManager():
         Args:
             item_ids (Union[List[int], int]): Target item ID(s).
         """
-        if isinstance(item_ids, int): item_ids = [item_ids]
-        id_set = set(item_ids)
-        for item in self.shop_items:
-            if item.item_id in id_set:
-                item.is_dirty = True
-                item.is_deleted = True
+        if isinstance(item_ids, int):
+            item_ids = [item_ids]
 
-    # --- Core Logic ---
+        for item_id in item_ids:
+            self._remove(shared.Table.shop_items, item_id)
+
+
     def initialize_database_model(self, table: shared.Table, **kwargs) -> Any:
         """
         Dynamically initializes a database model based on the target table.
@@ -355,16 +441,7 @@ class DatabaseManager():
                 model_class = TABLE_MAP[table]
                 table_name = table.name
                 
-                # Cache the schema to prevent hammering the DB on every single fetch
-                if table_name not in self._schema_cache:
-                    self.db_shirayume.execute(f"DESCRIBE {table_name}")
-                    # We only strictly require fields that cannot be null, have no default, and aren't auto-incremented
-                    self._schema_cache[table_name] = [
-                        row['Field'] for row in self.db_shirayume.fetchall() 
-                        if row['Null'] == 'NO' and row['Default'] is None and 'auto_increment' not in row['Extra']
-                    ]
-                
-                required_fields = self._schema_cache[table_name]
+                required_fields = self._schema_cache[table_name]["required"]
                 
                 if all(field in kwargs for field in required_fields):
                     return model_class.from_dict(kwargs)
@@ -374,90 +451,119 @@ class DatabaseManager():
                 function_name = "database.DatabaseManager.initialize_database_model",
                 description = f"Missing required fields for {table.name}"
             )
-            return None
+
         except Exception as e:
             helpers.custom_print(
                 level = shared.LogLevel.ERROR,
                 function_name = "database.DatabaseManager.initialize_database_model",
                 description = f"Error creating model for {table.name}: {e}"
             )
-            return None
+        
+        return None
 
     def clean_flags(self) -> None:
         """
         Resets all is_dirty and is_deleted flags across all tracked models dynamically.
         """
-        for table_enum in TABLE_MAP:
-            for item in getattr(self, table_enum.name):
+        for table in TABLE_MAP:
+            for item in getattr(self, table.name):
                 item.is_dirty = False
                 item.is_deleted = False
 
-    def database_commit(self) -> None:
+            self._dirty[table].clear()
+
+    def database_commit(self)->None:
         """
-        Efficiently batches and executes all pending dirty state changes into the database using reflection.
+        Efficiently executes all pending dirty state changes into the database.
         """
         try:
-            for table_enum, model_class in TABLE_MAP.items():
-                table_name = table_enum.name
-                items = getattr(self, table_name)
-                dirty_items = [item for item in items if item.is_dirty]
+            pending_cleanup = []
+
+            for table in TABLE_MAP:
+                dirty_items = list(self._dirty[table])
                 
                 if not dirty_items:
                     continue
 
-                pkeys = PRIMARY_KEYS[table_enum]
+                delete_items=[]
+                upsert_items=[]
+                
+                for item in dirty_items:
 
-                # Batch Deletions
-                deleted_items = [item for item in dirty_items if item.is_deleted]
-                if deleted_items:
-                    where_clause = " AND ".join([f"{pk}=%s" for pk in pkeys])
-                    delete_sql = f"DELETE FROM {table_name} WHERE {where_clause}"
-                    delete_data = [tuple(getattr(item, pk) for pk in pkeys) for item in deleted_items]
-                    self.db_shirayume.executemany(delete_sql, delete_data)
+                    if item.is_deleted:
+                        delete_items.append(item)
+                    else:
+                        upsert_items.append(item)
 
-                # Batch Insertions/Updates (Upsert)
-                upsert_items = [item for item in dirty_items if not item.is_deleted]
+                if delete_items:
+                    delete_data = [
+                        tuple(getattr(item, pk) for pk in PRIMARY_KEYS[table])
+                        for item in delete_items
+                    ]
+
+                    self.db_shirayume.executemany(
+                        self._sql_cache[table.name]["delete"],
+                        delete_data
+                    )
+                
+                    # Remember for later cleanup
+                    pending_cleanup.extend(
+                        (table, obj)
+                        for obj in delete_items
+                    )
+
                 if upsert_items:
-                    # Introspect actual DB columns dynamically just once per table commit
-                    self.db_shirayume.execute(f"DESCRIBE {table_name}")
-                    columns = [row['Field'] for row in self.db_shirayume.fetchall()]
+                    columns = self._schema_cache[table.name]["columns"]
+                    data = []
 
-                    placeholders = ", ".join(["%s"] * len(columns))
-                    col_str = ", ".join(columns)
-                    
-                    # Uses VALUES() which safely updates duplicate keys efficiently in standard MySQL connectors
-                    update_str = ", ".join([f"{col}=VALUES({col})" for col in columns if col not in pkeys])
-
-                    upsert_sql = f"""
-                        INSERT INTO {table_name} ({col_str})
-                        VALUES ({placeholders})
-                        ON DUPLICATE KEY UPDATE {update_str}
-                    """
-
-                    upsert_data = []
                     for item in upsert_items:
-                        row_values = []
+                        row = []
+
                         for col in columns:
                             val = getattr(item, col)
-                            # Handle serialization variations smoothly via reflection
+
                             if isinstance(val, shared.Action):
                                 val = val.name
-                            elif isinstance(val, (dict, list)):
+                            elif isinstance(val, (list, dict)):
                                 val = json.dumps(val)
-                            row_values.append(val)
-                        upsert_data.append(tuple(row_values))
 
-                    self.db_shirayume.executemany(upsert_sql, upsert_data)
+                            row.append(val)
 
+                        data.append(tuple(row))
+
+                    self.db_shirayume.executemany(
+                        self._sql_cache[table.name]["upsert"],
+                        data
+                    )
+                    
             self.db_connection.commit()
-            self.clean_flags()
+
+            # Execute after commit succeeded
+            tables_to_rebuild = set()
+
+            for table, obj in pending_cleanup:
+                obj.is_dirty = False
+                obj.is_deleted = False
+                
+                key = self._key(table, obj)
+                self._index[table].pop(key, None)
+                tables_to_rebuild.add(table)
+
+            # Rebuild lists in a single O(n) pass for each affected table
+            for table in tables_to_rebuild:
+                table_name = table.name
+                current_list = getattr(self, table_name)
+                # Keep objects that are still in the index (not deleted)
+                setattr(self, table_name, [x for x in current_list if self._key(table, x) in self._index[table]])
+
+            for table in TABLE_MAP:
+                for obj in self._dirty[table]:
+                    obj.is_dirty = False
+
+                self._dirty[table].clear()
             
-        except mysql.connector.Error as e:
-            helpers.custom_print(
-                level = shared.LogLevel.ERROR,
-                function_name = "database.DatabaseManager.database_commit",
-                description = f"Failed to commit to database: {e}"
-            )
+        except mysql.connector.Error:
+            self.db_connection.rollback()
             raise
 
     def database_close(self) -> None:
@@ -499,8 +605,8 @@ def setup(DB_HOST: str, DB_USER: str, DB_PASSWORD: str, DATABASE: str) -> None:
         description = f"DB_MANAGER initialized ({DB_MANAGER})"
     )
     try:
-        for table_enum in TABLE_MAP:
-            table_name = table_enum.name
+        for table in TABLE_MAP:
+            table_name = table.name
             helpers.custom_print(
                 level = shared.LogLevel.DEBUG,
                 function_name = "database.DatabaseManager.setup",
@@ -512,12 +618,11 @@ def setup(DB_HOST: str, DB_USER: str, DB_PASSWORD: str, DATABASE: str) -> None:
             
             models_list = []
             for row in rows:
-                model = DB_MANAGER.initialize_database_model(table_enum, **row)
+                model = DB_MANAGER.initialize_database_model(table, **row)
                 if model:
                     models_list.append(model)
             
-            # Use reflection to invoke the respective add call dynamically
-            getattr(DB_MANAGER, f"add_{table_name}")(models_list)
+            DB_MANAGER._add(table, models_list, mark_dirty=False)
             
             helpers.custom_print(
                 level = shared.LogLevel.DEBUG,

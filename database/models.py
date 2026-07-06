@@ -6,13 +6,26 @@ from utils.shared import Action
 class User():
     instance_counter = 0
 
+    __slots__ = (
+        "_user_id",
+        "_username",
+        "_discriminator",
+        "_avatar_url",
+        "_is_bot",
+        "_balance",
+        "_created_at",
+        "_updated_at",
+        "_is_dirty",
+        "_is_deleted"
+    )
+
     def __init__(self,
         user_id: int,
         username: str,
         discriminator: str,
         avatar_url: str,
         is_bot: bool,
-        currency: int,
+        balance: int,
         created_at: datetime,
         updated_at: datetime,
         is_dirty: bool,
@@ -23,7 +36,7 @@ class User():
         self.discriminator = discriminator
         self.avatar_url = avatar_url
         self.is_bot = is_bot
-        self.currency = currency
+        self.balance = balance
         self.created_at = created_at
         self.updated_at = updated_at
         self.is_dirty = is_dirty
@@ -38,12 +51,12 @@ class User():
                 username = data["username"],
                 discriminator = data["discriminator"],
                 avatar_url = data["avatar_url"],
-                is_bot = data["is_bot"],
-                currency = data["currency"],
+                is_bot = bool(data["is_bot"]),
+                balance = data["balance"],
                 created_at = data["created_at"],
                 updated_at = data.get("updated_at", data["created_at"]),
-                is_dirty = data.get("is_dirty", False),
-                is_deleted = data.get("is_deleted", False)
+                is_dirty = bool(data.get("is_dirty", False)),
+                is_deleted = bool(data.get("is_deleted", False))
             )
 
     def compare(self, model: "User") -> bool:
@@ -90,12 +103,12 @@ class User():
         else: raise TypeError("Incorrect type for is_bot")
 
     @property
-    def currency(self): return self._currency
+    def balance(self): return self._balance
 
-    @currency.setter
-    def currency(self, value: int):
-        if type(value) == int: self._currency = value
-        else: raise TypeError("Incorrect type for currency")
+    @balance.setter
+    def balance(self, value: int):
+        if type(value) == int: self._balance = value
+        else: raise TypeError("Incorrect type for balance")
 
     @property
     def created_at(self): return self._created_at
@@ -132,6 +145,29 @@ class User():
 class Guild():
     instance_counter = 0
 
+    __slots__ = (
+        "_guild_id",
+        "_owner_id",
+        "_name",
+        "_icon_url",
+        "_member_count",
+        "_bot_count",
+        "_is_available",
+        "_welcome_channel",
+        "_leave_channel",
+        "_joined_at",
+        "_created_at",
+        "_updated_at",
+        "_is_dirty",
+        "_is_deleted",
+        "_stats_enabled",
+        "_stats_category_id",
+        "_stats_channel_ids",
+        "_economy_enabled",
+        "_base_message_reward",
+        "_currency"
+    )
+
     def __init__(self,
         guild_id: int,
         owner_id: int,
@@ -148,11 +184,11 @@ class Guild():
         is_dirty: bool,
         is_deleted: bool,
         stats_enabled: bool = False,
-        stats_category_id: int | None = None,
+        stats_category_id: Union[int, None] = None,
         stats_channel_ids: dict = None,
-        economy_enabled: bool = True,
+        economy_enabled: bool = False,
         base_message_reward: int = 0,
-        currency_name: str = "Credits"
+        currency: str = "Credits"
     ) -> None:
         self.guild_id = guild_id
         self.owner_id = owner_id
@@ -175,7 +211,7 @@ class Guild():
         
         self.economy_enabled = economy_enabled
         self.base_message_reward = base_message_reward
-        self.currency_name = currency_name
+        self.currency = currency
         
         Guild.instance_counter += 1
 
@@ -189,20 +225,20 @@ class Guild():
                 icon_url = data["icon_url"],
                 member_count = data["member_count"],
                 bot_count = data["bot_count"],
-                is_available = data["is_available"],
+                is_available = bool(data["is_available"]),
                 welcome_channel = data["welcome_channel"],
                 leave_channel = data["leave_channel"],
                 joined_at = data["joined_at"],
                 created_at = data["created_at"],
                 updated_at = data.get("updated_at", data["created_at"]),
-                is_dirty = data.get("is_dirty", False),
-                is_deleted = data.get("is_deleted", False),
-                stats_enabled = data.get("stats_enabled", False),
+                is_dirty = bool(data.get("is_dirty", False)),
+                is_deleted = bool(data.get("is_deleted", False)),
+                stats_enabled = bool(data.get("stats_enabled", False)),
                 stats_category_id = data.get("stats_category_id", None),
                 stats_channel_ids = json.loads(data["stats_channel_ids"]) if isinstance(data.get("stats_channel_ids"), str) else data.get("stats_channel_ids", {}),
-                economy_enabled = data.get("economy_enabled", True),
+                economy_enabled = bool(data.get("economy_enabled", False)),
                 base_message_reward = data.get("base_message_reward", 0),
-                currency_name = data.get("currency_name", "Credits")
+                currency = data.get("currency", "Credits")
             )
 
     def compare(self, model: "Guild") -> bool:
@@ -332,8 +368,8 @@ class Guild():
     def stats_category_id(self): return self._stats_category_id
     
     @stats_category_id.setter
-    def stats_category_id(self, value: int | None):
-        if not value or type(value) == int: self._stats_category_id = value
+    def stats_category_id(self, value: Union[int, None]):
+        if value is None or type(value) == int: self._stats_category_id = value
         else: raise TypeError("Incorrect type for stats_category_id")
 
     @property
@@ -361,15 +397,31 @@ class Guild():
         else: raise TypeError("Incorrect type for base_message_reward")
 
     @property
-    def currency_name(self): return self._currency_name
+    def currency(self): return self._currency
 
-    @currency_name.setter
-    def currency_name(self, value: str):
-        if type(value) == str: self._currency_name = value
-        else: raise TypeError("Incorrect type for currency_name")
+    @currency.setter
+    def currency(self, value: str):
+        if type(value) == str: self._currency = value
+        else: raise TypeError("Incorrect type for currency")
 
 class UserGuildSettings():
     instance_counter = 0
+
+    __slots__ = (
+        "_user_id",
+        "_guild_id",
+        "_joined_at",
+        "_last_interaction",
+        "_experience",
+        "_level",
+        "_custom_title",
+        "_last_xp_message",
+        "_created_at",
+        "_updated_at",
+        "_is_member",
+        "_is_dirty",
+        "_is_deleted"
+    )
 
     def __init__(self,
         user_id: int,
@@ -415,9 +467,9 @@ class UserGuildSettings():
                 last_xp_message = data["last_xp_message"],
                 created_at = data["created_at"],
                 updated_at = data.get("updated_at", data["created_at"]),
-                is_member = data["is_member"],
-                is_dirty = data.get("is_dirty", False),
-                is_deleted = data.get("is_deleted", False)
+                is_member = bool(data["is_member"]),
+                is_dirty = bool(data.get("is_dirty", False)),
+                is_deleted = bool(data.get("is_deleted", False))
             )
 
     def compare(self, model: "UserGuildSettings") -> bool:
@@ -530,6 +582,21 @@ class UserGuildSettings():
 class ModerationLog():
     instance_counter = 0
 
+    __slots__ = (
+        "_mlog_id",
+        "_guild_id",
+        "_user_id",
+        "_moderator_id",
+        "_action_type",
+        "_reason",
+        "_action_timestamp",
+        "_duration_minutes",
+        "_is_active",
+        "_pardoned",
+        "_is_dirty",
+        "_is_deleted"
+    )
+
     def __init__(self,
         mlog_id: int,
         guild_id: int,
@@ -561,19 +628,27 @@ class ModerationLog():
     @classmethod
     def from_dict(cls, data: dict):
         if type(data) is dict:
+
+            action_value = data["action_type"]
+            if isinstance(action_value, str):
+                try:
+                    action_value = Action[action_value]
+                except KeyError:
+                    action_value = Action(action_value)
+
             return cls(
                 mlog_id = data["mlog_id"],
                 guild_id = data["guild_id"],
                 user_id = data["user_id"],
                 moderator_id = data["moderator_id"],
-                action_type = data["action_type"],
+                action_type = action_value,
                 reason = data["reason"],
                 action_timestamp = data["action_timestamp"],
                 duration_minutes = data["duration_minutes"],
-                is_active = data["is_active"],
-                pardoned = data["pardoned"],
-                is_dirty = data.get("is_dirty", False),
-                is_deleted = data.get("is_deleted", False)
+                is_active = bool(data["is_active"]),
+                pardoned = bool(data["pardoned"]),
+                is_dirty = bool(data.get("is_dirty", False)),
+                is_deleted = bool(data.get("is_deleted", False))
             )
 
     def compare(self, model: "ModerationLog") -> bool:
@@ -583,7 +658,7 @@ class ModerationLog():
     def mlog_id(self): return self._mlog_id
 
     @mlog_id.setter
-    def mlog_id(self, value):
+    def mlog_id(self, value: int):
         if type(value) == int:
             if value == -1: value = ModerationLog.instance_counter
             self._mlog_id = value
@@ -593,7 +668,7 @@ class ModerationLog():
     def guild_id(self): return self._guild_id
 
     @guild_id.setter
-    def guild_id(self, value):
+    def guild_id(self, value: int):
         if type(value) == int: self._guild_id = value
         else: raise TypeError("Incorrect type for guild_id")
 
@@ -601,7 +676,7 @@ class ModerationLog():
     def user_id(self): return self._user_id
 
     @user_id.setter
-    def user_id(self, value):
+    def user_id(self, value: int):
         if type(value) == int: self._user_id = value
         else: raise TypeError("Incorrect type for user_id")
 
@@ -609,7 +684,7 @@ class ModerationLog():
     def moderator_id(self): return self._moderator_id
 
     @moderator_id.setter
-    def moderator_id(self, value):
+    def moderator_id(self, value: int):
         if type(value) == int: self._moderator_id = value
         else: raise TypeError("Incorrect type for moderator_id")
 
@@ -617,7 +692,7 @@ class ModerationLog():
     def action_type(self): return self._action_type
 
     @action_type.setter
-    def action_type(self, value):
+    def action_type(self, value: Action):
         if type(value) == Action: self._action_type = value
         else: raise TypeError("Incorrect type for action_type")
 
@@ -680,6 +755,20 @@ class ModerationLog():
 class Poll():
     instance_counter = 0
 
+    __slots__ = (
+        "_poll_id",
+        "_guild_id",
+        "_creator_id",
+        "_question",
+        "_votes",
+        "_is_active",
+        "_created_at",
+        "_updated_at",
+        "_ends_at",
+        "_is_dirty",
+        "_is_deleted"
+    )
+
     def __init__(self,
         poll_id: int,
         guild_id: int,
@@ -718,12 +807,12 @@ class Poll():
                 creator_id = data["creator_id"],
                 question = data["question"],
                 votes = parsed_votes,
-                is_active = data["is_active"],
+                is_active = bool(data["is_active"]),
                 created_at = data["created_at"],
                 updated_at = data.get("updated_at", data["created_at"]),
                 ends_at = data.get("ends_at", data["created_at"]),
-                is_dirty = data.get("is_dirty", False),
-                is_deleted = data.get("is_deleted", False)
+                is_dirty = bool(data.get("is_dirty", False)),
+                is_deleted = bool(data.get("is_deleted", False))
             )
 
     def to_dict(self) -> dict:
@@ -836,6 +925,15 @@ class Poll():
 class UserEconomy():
     instance_counter = 0
 
+    __slots__ = (
+        "_guild_id",
+        "_user_id",
+        "_local_balance",
+        "_last_message_reward_time",
+        "_is_dirty",
+        "_is_deleted"
+    )
+
     def __init__(self,
         guild_id: int,
         user_id: int,
@@ -860,8 +958,8 @@ class UserEconomy():
                 user_id = data["user_id"],
                 local_balance = data["local_balance"],
                 last_message_reward_time = data["last_message_reward_time"],
-                is_dirty = data.get("is_dirty", False),
-                is_deleted = data.get("is_deleted", False)
+                is_dirty = bool(data.get("is_dirty", False)),
+                is_deleted = bool(data.get("is_deleted", False))
             )
 
     def compare(self, model: "UserEconomy") -> bool:
@@ -918,6 +1016,17 @@ class UserEconomy():
 class ShopItem():
     instance_counter = 0
 
+    __slots__ = (
+        "_item_id",
+        "_guild_id",
+        "_name",
+        "_description",
+        "_price",
+        "_role_id",
+        "_is_dirty",
+        "_is_deleted"
+    )
+
     def __init__(self,
         item_id: int,
         guild_id: int,
@@ -948,8 +1057,8 @@ class ShopItem():
                 description = data["description"],
                 price = data["price"],
                 role_id = data.get("role_id", None),
-                is_dirty = data.get("is_dirty", False),
-                is_deleted = data.get("is_deleted", False)
+                is_dirty = bool(data.get("is_dirty", False)),
+                is_deleted = bool(data.get("is_deleted", False))
             )
 
     def compare(self, model: "ShopItem") -> bool:
