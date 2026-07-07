@@ -19,14 +19,14 @@ class AgentResponse:
     tool_calls: list[ToolCall] = field(default_factory=list)
 
 @dataclass
-class BrainRequest:
-    system_prompt: str
-    history: list[dict]
-    tools: list[ToolDefinition]
-
-@dataclass
 class ToolDefinition:
     name: str
     description: str
     parameters: dict
     function: Callable
+
+@dataclass
+class BrainRequest:
+    system_prompt: str
+    history: list[dict]
+    tools: list[ToolDefinition]

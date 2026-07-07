@@ -287,7 +287,7 @@ class Moderation(commands.Cog):
 
             # The hard limit is 14 days
             # We use 13 days and 23 hours to be absolutely safe
-            cutoff_datetime = discord.utils.utcnow() - datetime.timedelta(days=13, hours=23)
+            cutoff_datetime = discord.utils.utcnow() - timedelta(days=13, hours=23)
 
             embed = helpers.embed_generator(
                 title="Purge",

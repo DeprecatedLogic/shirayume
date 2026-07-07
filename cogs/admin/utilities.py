@@ -41,7 +41,7 @@ async def sync(ctx: commands.Context, guilds: commands.Greedy[discord.Object],
         title="Syncing",
         description="This might take a while. Syncing..."
     )
-    temp_msg = ctx.send(embed=embed)
+    temp_msg = await ctx.send(embed=embed)
 
     if not guilds:
         if spec == "~":
@@ -56,7 +56,7 @@ async def sync(ctx: commands.Context, guilds: commands.Greedy[discord.Object],
         else:
             synced = await ctx.bot.tree.sync()
 
-        await temp_msg.message.delete()
+        await temp_msg.delete()
         embed = helpers.embed_generator(
             title="Syncing",
             description=f"Synced {len(synced)} commands {'globally' if spec is None else 'to the current guild.'}"
