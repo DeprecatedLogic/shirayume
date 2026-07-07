@@ -121,7 +121,7 @@ CREATE TABLE user_economies (
     PRIMARY KEY (guild_id, user_id),
     CONSTRAINT fk_usereconomy_guildid_guilds_guildid
         FOREIGN KEY (guild_id) REFERENCES guilds(guild_id),
-	CONSTRAINT fk_usereconomy_userid_users_userid
+	CONSTRAINT fk_user_economies_userid_users_userid
         FOREIGN KEY (user_id) REFERENCES users(user_id)
 );
 
@@ -132,6 +132,15 @@ CREATE TABLE shop_items (
     description VARCHAR(255) NOT NULL,
     price INT DEFAULT 0 NOT NULL,
     role_id BIGINT NULL,
-    CONSTRAINT fk_shopitem_guildid_guilds_guildid
+    CONSTRAINT fk_shop_items_guildid_guilds_guildid
         FOREIGN KEY (guild_id) REFERENCES guilds(guild_id)
+);
+
+CREATE TABLE global_shop_items (
+    item_id BIGINT PRIMARY KEY,
+    name VARCHAR(64) NOT NULL,
+    description VARCHAR(255) NOT NULL,
+    price INT DEFAULT 0 NOT NULL,
+    item_type VARCHAR(32) NOT NULL,
+    metadata JSON NOT NULL
 );

@@ -1,6 +1,6 @@
 from typing import Dict, List, Any, Optional
 from database import database_manager, models
-from utils import shared
+from utils import shared, helpers
 
 class GlobalEconomyService:
     """

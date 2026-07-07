@@ -113,7 +113,7 @@ class LocalEconomy(commands.Cog):
         """
         Initializes the LocalEconomy Cog.
         """
-        self.eco_service = EconomyService()
+        self.service = EconomyService()
     
     @commands.guild_only()
     @commands.Cog.listener()
@@ -127,7 +127,7 @@ class LocalEconomy(commands.Cog):
         if message.author.bot or not message.guild:
             return
         
-        amount_rewarded: int = self.eco_service.process_message_reward(message.guild.id, message.author.id)
+        amount_rewarded: int = self.service.process_message_reward(message.guild.id, message.author.id)
 
     @app_commands.command(name="balances", description="Displays your wallet balance for each mutual server.")
     async def check_all_balances(self, interaction: discord.Interaction, private: bool = True) -> None:
@@ -150,8 +150,8 @@ class LocalEconomy(commands.Cog):
             description="Here are your current funds across mutual servers:"
         )
         for guild in guilds:
-            currency: str = self.eco_service.get_guild_currency(guild.id)
-            balance: int = self.eco_service.get_balance(guild.id, user.id)
+            currency: str = self.service.get_guild_currency(guild.id)
+            balance: int = self.service.get_balance(guild.id, user.id)
             embed.add_field(
                 name=f"**Server:** {guild.name}",
                 value=f"**> Balance:** {balance} {currency}",
@@ -175,8 +175,8 @@ class LocalEconomy(commands.Cog):
             member is not None and interaction.user.guild_permissions.administrator
         ) else interaction.user
         
-        currency: str = self.eco_service.get_guild_currency(interaction.guild.id)
-        balance: int = self.eco_service.get_balance(interaction.guild.id, target_user.id)
+        currency: str = self.service.get_guild_currency(interaction.guild.id)
+        balance: int = self.service.get_balance(interaction.guild.id, target_user.id)
 
         embed = helpers.embed_generator(
             title="Balance",
@@ -219,8 +219,8 @@ class LocalEconomy(commands.Cog):
         
         guild: discord.Guild = interaction.guild
 
-        if self.eco_service.transfer_funds(guild.id, sender.id, member.id, amount):
-            currency: str = self.eco_service.get_guild_currency(guild.id)
+        if self.service.transfer_funds(guild.id, sender.id, member.id, amount):
+            currency: str = self.service.get_guild_currency(guild.id)
             embed = helpers.embed_generator(
                 title="Transfer Funds",
                 description=f"Successfully transferred `{amount} {currency}` to user {member.mention}.",
@@ -259,7 +259,7 @@ class LocalEconomy(commands.Cog):
         user: discord.Member = interaction.user
         guild: discord.Guild = interaction.guild
         
-        shop_items: list = self.eco_service.get_shop_items(guild.id)
+        shop_items: list = self.service.get_shop_items(guild.id)
         if not shop_items:
             embed = helpers.embed_generator(
                 title="Empty Shop",
@@ -268,7 +268,7 @@ class LocalEconomy(commands.Cog):
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
 
-        currency: str = self.eco_service.get_guild_currency(guild.id)
+        currency: str = self.service.get_guild_currency(guild.id)
         
         view = ShopPaginator(shop_items=shop_items, guild_name=guild.name, currency=currency, user_id=user.id)
         embed = view.generate_embed()
@@ -291,7 +291,7 @@ class LocalEconomy(commands.Cog):
         guild: discord.Guild = interaction.guild
         user: discord.Member = interaction.user
         
-        result: dict = self.eco_service.purchase_item(guild.id, user.id, item_name)
+        result: dict = self.service.purchase_item(guild.id, user.id, item_name)
         
         if not result.get("success"):
             embed = helpers.embed_generator(
@@ -303,7 +303,7 @@ class LocalEconomy(commands.Cog):
             return
 
         item_data: dict = result.get("item", {})
-        currency: str = self.eco_service.get_guild_currency(guild.id)
+        currency: str = self.service.get_guild_currency(guild.id)
         
         embed = helpers.embed_generator(
             title="Purchase Successful!",
@@ -352,11 +352,11 @@ class LocalEconomy(commands.Cog):
         """
         guild = interaction.guild
 
-        original_balance = self.eco_service.get_balance(guild.id, member.id)
-        new_balance = self.eco_service.add_balance(guild.id, member.id, amount)
+        original_balance = self.service.get_balance(guild.id, member.id)
+        new_balance = self.service.add_balance(guild.id, member.id, amount)
 
         if new_balance > original_balance:
-            currency = self.eco_service.get_guild_currency(guild.id)
+            currency = self.service.get_guild_currency(guild.id)
             embed = helpers.embed_generator(
                 title="Transfer Funds",
                 description=f"Successfully added `{amount} {currency}` to {member.name}'s balance.",

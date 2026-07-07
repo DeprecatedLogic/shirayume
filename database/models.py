@@ -1,7 +1,7 @@
 from typing import List, Dict, Union
 from datetime import datetime
 import json
-from utils.shared import Action
+from utils.shared import Action, GlobalItemType
 
 class User():
     instance_counter = 0
