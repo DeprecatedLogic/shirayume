@@ -1,5 +1,5 @@
 from collections import deque
-from utils.agent_models import MessageDTO
+from agent.agent_models import MessageDTO
 
 class ConversationManager:
     def __init__(self, history_size: int = 30) -> None:
