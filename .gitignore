@@ -209,3 +209,9 @@ __marimo__/
 # Backups
 *.bak
 *.bkp
+
+# Local LLM runtime
+llama.cpp/
+
+# Local models
+models/
