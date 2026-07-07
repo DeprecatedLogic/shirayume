@@ -147,7 +147,7 @@ class GlobalEconomy(commands.GroupCog, group_name="global"):
         await interaction.response.send_message(embed=embed)
 
 async def setup() -> None:
-    if shared.GLOBAL_CONFIG["economy"]["global"]["is_enabled"]:
+    if shared.GLOBAL_CONFIG["features"]["economy"]["global"]["is_enabled"]:
         if "GlobalEconomy" not in shared.SHIRAYUME.cogs:
             await shared.SHIRAYUME.add_cog(GlobalEconomy())
     else:

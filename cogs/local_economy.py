@@ -384,7 +384,7 @@ class LocalEconomy(commands.Cog):
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
 async def setup() -> None:
-    if shared.GLOBAL_CONFIG["economy"]["local"]["is_enabled"]:
+    if shared.GLOBAL_CONFIG["features"]["economy"]["local"]["is_enabled"]:
         if "LocalEconomy" not in shared.SHIRAYUME.cogs:
             await shared.SHIRAYUME.add_cog(LocalEconomy())
     else:

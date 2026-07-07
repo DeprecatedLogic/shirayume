@@ -27,7 +27,7 @@ class User():
         avatar_url: str,
         is_bot: bool,
         balance: int,
-        _active_items: dict,
+        active_items: dict,
         created_at: datetime,
         updated_at: datetime,
         is_dirty: bool,
