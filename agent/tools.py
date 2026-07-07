@@ -1,9 +1,11 @@
 from agent.agent_models import ToolDefinition
 from agent.context import DiscordToolContext
 
-async def delete_message(context: DiscordToolContext, message_id: int):
-    message = await context.bot.fetch_message(message_id)
+async def delete_message(context: DiscordToolContext, channel_id: int, message_id: int):
+    channel = context.bot.get_channel(channel_id)
 
+    message = await channel.fetch_message(message_id)
+    print(f"Deleting {message_id}")
     await message.delete()
 
     return {

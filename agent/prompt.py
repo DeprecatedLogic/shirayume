@@ -87,31 +87,33 @@ Use this severity scale:
 5 = urgent danger, credible threat, extreme hate, explicit self-harm encouragement, or content requiring immediate escalation.
 """
 
-ACTION_GUIDELINES = """
-Choose one recommended action:
+MESSAGE_ACTION = """
+Choose exactly one message_action:
+
+keep:
+The message should remain visible.
+
+delete:
+The message violates moderation policy and should be removed.
+"""
+
+USER_ACTION = """
+Choose exactly one user_action:
 
 ignore:
-No moderation concern.
+No action toward the user.
 
 log_only:
-Record the event but no user action is required.
+Record the event for future reference.
 
 warn_user:
-A warning may be appropriate.
-
-delete_message:
-The message likely violates server rules and should be removed.
+Issue a warning.
 
 timeout_user:
-The user should temporarily lose communication privileges.
+Temporarily restrict the user's ability to send messages.
 
 escalate_to_human:
-A moderator should manually review the situation.
-
-Use escalate_to_human when:
-- context is missing
-- severity is high
-- the situation involves threats, hate speech, self-harm, or uncertainty.
+A human moderator should review the case.
 """
 
 OUTPUT_GUIDELINES = """
@@ -122,17 +124,36 @@ Do not exaggerate.
 """
 
 OUTPUT_FORMAT = """
-Return your moderation assessment using the required structured format.
+You must return your moderation assessment as valid JSON.
 
-The response must include:
+The JSON must contain exactly these fields:
 
-- category
-- severity
-- explanation
-- recommended_action
-- needs_human_review
+{
+    "category": "one of the allowed categories",
+    "severity": 0,
+    "explanation": "short neutral explanation",
+    "recommended_action": "one of the allowed actions",
+    "needs_human_review": false
+}
 
-Do not include additional fields.
+Rules:
+- Do not include markdown.
+- Do not include code fences.
+- Do not include additional text before or after the JSON.
+- The output must be directly parseable by a JSON parser.
+"""
+
+OUTPUT_EXAMPLE = """
+Example output:
+
+{
+    "category": "hate_speech",
+    "severity": 5,
+    "explanation": "...",
+    "message_action": "delete",
+    "user_action": "escalate_to_human",
+    "needs_human_review": true
+}
 """
 
 SYSTEM_PROMPT = "\n\n".join([
@@ -141,7 +162,9 @@ SYSTEM_PROMPT = "\n\n".join([
     MODERATION_PRINCIPLES,
     CATEGORIES,
     SEVERITY,
-    ACTION_GUIDELINES,
+    MESSAGE_ACTION,
+    USER_ACTION,
     OUTPUT_FORMAT,
     OUTPUT_GUIDELINES,
+    OUTPUT_EXAMPLE
 ])
