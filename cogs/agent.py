@@ -32,7 +32,7 @@ class AgentCog(commands.Cog):
 
         dto = MessageDTO(
             channel_id=message.channel.id,
-            author=message.author.display_name,
+            author=message.author.name,
             role="user",
             content=content,
         )
