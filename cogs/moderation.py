@@ -371,5 +371,5 @@ class Moderation(commands.Cog):
 
 
 async def setup():
-    if Moderation() not in shared.SHIRAYUME.cogs:
+    if "Moderation" not in shared.SHIRAYUME.cogs:
         await shared.SHIRAYUME.add_cog(Moderation())

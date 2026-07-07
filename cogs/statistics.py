@@ -151,4 +151,5 @@ async def setup():
     for guild in shared.SHIRAYUME.guilds:
         shared.SHIRAYUME.loop.create_task(stats_cog._sync_channels(guild))
 
-    await shared.SHIRAYUME.add_cog(stats_cog)
+    if "Statistics" not in shared.SHIRAYUME.cogs:
+        await shared.SHIRAYUME.add_cog(stats_cog)
