@@ -1,5 +1,5 @@
 from collections import deque
-from utils.shared import MessageDTO
+from utils.agent_models import MessageDTO
 
 class ConversationManager:
     def __init__(self, history_size: int = 30) -> None:
@@ -14,16 +14,11 @@ class ConversationManager:
 
         self._conversations[channel_id].append(message)
 
-    def get_history(self, channel_id: int) -> list[dict]:
+    def get_history(self, channel_id: int) -> list[MessageDTO]:
         if channel_id not in self._conversations:
             return []
 
-        history = self._conversations[channel_id]
-
-        return [
-            {"role": msg.role, "content": msg.content}
-            for msg in history
-        ]
+        return list(self._conversations[channel_id])
 
     def clear_history(self, channel_id: int):
         if channel_id not in self._conversations:
