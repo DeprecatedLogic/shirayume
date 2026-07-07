@@ -3,7 +3,7 @@ from discord import app_commands
 from discord.ext import commands
 from discord.ui import View, button
 from utils import shared, helpers
-from services import economy
+from services.local_economy import EconomyService
 
 class ShopPaginator(View):
     """
@@ -113,7 +113,7 @@ class LocalEconomy(commands.Cog):
         """
         Initializes the LocalEconomy Cog.
         """
-        self.eco_service = economy.EconomyService()
+        self.eco_service = EconomyService()
     
     @commands.guild_only()
     @commands.Cog.listener()
@@ -384,4 +384,12 @@ class LocalEconomy(commands.Cog):
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
 async def setup() -> None:
-    await shared.SHIRAYUME.add_cog(LocalEconomy())
+    if shared.GLOBAL_CONFIG["economy"]["local"]["is_enabled"]:
+        if "LocalEconomy" not in shared.SHIRAYUME.cogs:
+            await shared.SHIRAYUME.add_cog(LocalEconomy())
+    else:
+        helpers.custom_print(
+            level=shared.LogLevel.INFO,
+            function_name="cogs.economy.setup",
+            description="Local economy is disabled, setup skipped"
+        )

@@ -16,6 +16,7 @@ TABLE_MAP = {
     shared.Table.polls: models.Poll,
     shared.Table.user_economies: models.UserEconomy,
     shared.Table.shop_items: models.ShopItem,
+    shared.Table.global_shop_items: models.GlobalShopItem,
 }
 
 # Explicit definition of primary keys to correctly handle deletions and upsert updates
@@ -27,6 +28,7 @@ PRIMARY_KEYS = {
     shared.Table.polls: ["poll_id"],
     shared.Table.user_economies: ["guild_id", "user_id"],
     shared.Table.shop_items: ["item_id"],
+    shared.Table.global_shop_items: ["item_id"],
 }
 
 class DatabaseManager:
@@ -48,6 +50,7 @@ class DatabaseManager:
         self.polls = []
         self.user_economies = []
         self.shop_items = []
+        self.global_shop_items = []
 
         # O(1) lookup indices
         self._index = {
@@ -160,6 +163,7 @@ class DatabaseManager:
             self._mark_dirty(table, obj)
 
     def _initialize_schema(self) -> None:
+        """ _summary_ """
         for table in TABLE_MAP:
 
             table_name = table.name
@@ -425,6 +429,30 @@ class DatabaseManager:
             self._remove(shared.Table.shop_items, item_id)
 
 
+    def add_global_shop_items(self, items: Union[List[models.GlobalShopItem], models.GlobalShopItem]) -> None:
+        """
+        _summary_
+
+        Args:
+            items (Union[List[models.GlobalShopItem], models.GlobalShopItem]): _description_
+        """
+        self._add(shared.Table.global_shop_items, items)
+
+    def remove_global_shop_items(self, item_ids: Union[List[int], int]) -> None:
+        """
+        _summary_
+
+        Args:
+            item_ids (Union[List[int], int]): _description_
+
+        Returns:
+            _type_: _description_
+        """
+        if isinstance(item_ids, int): item_ids = [item_ids]
+        for item_id in item_ids:
+            self._remove(shared.Table.global_shop_items, item_id)
+
+
     def initialize_database_model(self, table: shared.Table, **kwargs) -> Any:
         """
         Dynamically initializes a database model based on the target table.
@@ -522,7 +550,7 @@ class DatabaseManager:
                         for col in columns:
                             val = getattr(item, col)
 
-                            if isinstance(val, shared.Action):
+                            if isinstance(val, (shared.Action, shared.GlobalItemType)):
                                 val = val.name
                             elif isinstance(val, (list, dict)):
                                 val = json.dumps(val)

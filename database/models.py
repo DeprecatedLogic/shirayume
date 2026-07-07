@@ -13,6 +13,7 @@ class User():
         "_avatar_url",
         "_is_bot",
         "_balance",
+        "_active_items",
         "_created_at",
         "_updated_at",
         "_is_dirty",
@@ -26,6 +27,7 @@ class User():
         avatar_url: str,
         is_bot: bool,
         balance: int,
+        _active_items: dict,
         created_at: datetime,
         updated_at: datetime,
         is_dirty: bool,
@@ -37,10 +39,12 @@ class User():
         self.avatar_url = avatar_url
         self.is_bot = is_bot
         self.balance = balance
+        self.active_items = active_items if active_items is not None else {} # todo: don't check
         self.created_at = created_at
         self.updated_at = updated_at
         self.is_dirty = is_dirty
         self.is_deleted = is_deleted
+
         User.instance_counter += 1
 
     @classmethod
@@ -53,6 +57,7 @@ class User():
                 avatar_url = data.get("avatar_url", ""),
                 is_bot = bool(data["is_bot"]),
                 balance = data.get("balance", 0),
+                active_items = data.get("active_items", {}),
                 created_at = data["created_at"],
                 updated_at = data.get("updated_at", data["created_at"]),
                 is_dirty = bool(data.get("is_dirty", False)),
@@ -142,6 +147,14 @@ class User():
         if type(value) == bool: self._is_deleted = value
         else: raise TypeError("Incorrect type for is_deleted")
 
+    @property
+    def active_items(self): return self._active_items
+
+    @active_items.setter
+    def active_items(self, value: dict):
+        if type(value) == dict: self._active_items = value
+        else: raise TypeError("Incorrect type for active_items")
+
 class Guild():
     instance_counter = 0
 
@@ -165,7 +178,9 @@ class Guild():
         "_stats_channel_ids",
         "_economy_enabled",
         "_base_message_reward",
-        "_currency"
+        "_currency",
+        "_yume_points",
+        "_tax_rate"
     )
 
     def __init__(self,
@@ -188,7 +203,9 @@ class Guild():
         stats_channel_ids: dict = None,
         economy_enabled: bool = False,
         base_message_reward: int = 0,
-        currency: str = "Credits"
+        currency: str = "Credits",
+        yume_points: int = 0,
+        tax_rate: float = 0.05
     ) -> None:
         self.guild_id = guild_id
         self.owner_id = owner_id
@@ -212,6 +229,8 @@ class Guild():
         self.economy_enabled = economy_enabled
         self.base_message_reward = base_message_reward
         self.currency = currency
+        self.yume_points = yume_points
+        self.tax_rate = tax_rate
         
         Guild.instance_counter += 1
 
@@ -222,23 +241,25 @@ class Guild():
                 guild_id = data["guild_id"],
                 owner_id = data["owner_id"],
                 name = data["name"],
-                icon_url = data["icon_url"],
+                icon_url = data.get("icon_url", ""),
                 member_count = data["member_count"],
                 bot_count = data["bot_count"],
                 is_available = bool(data["is_available"]),
-                welcome_channel = data["welcome_channel"],
-                leave_channel = data["leave_channel"],
+                welcome_channel = data.get("welcome_channel", None),
+                leave_channel = data.get("leave_channel", None),
                 joined_at = data["joined_at"],
                 created_at = data["created_at"],
                 updated_at = data.get("updated_at", data["created_at"]),
-                is_dirty = bool(data.get("is_dirty", False)),
-                is_deleted = bool(data.get("is_deleted", False)),
                 stats_enabled = bool(data.get("stats_enabled", False)),
                 stats_category_id = data.get("stats_category_id", None),
                 stats_channel_ids = data.get("stats_channel_ids", {}),
                 economy_enabled = bool(data.get("economy_enabled", False)),
                 base_message_reward = data.get("base_message_reward", 0),
-                currency = data.get("currency", "Credits")
+                currency = data.get("currency", "Credits"),
+                yume_points = data.get("yume_points", 0),
+                tax_rate = data.get("tax_rate", 0.05),
+                is_dirty = bool(data.get("is_dirty", False)),
+                is_deleted = bool(data.get("is_deleted", False)),
             )
 
     def compare(self, model: "Guild") -> bool:
@@ -404,6 +425,22 @@ class Guild():
         if type(value) == str: self._currency = value
         else: raise TypeError("Incorrect type for currency")
 
+    @property
+    def yume_points(self): return self._yume_points
+
+    @yume_points.setter
+    def yume_points(self, value: int):
+        if type(value) == int: self._yume_points = value
+        else: raise TypeError("Incorrect type for yume_points")
+
+    @property
+    def tax_rate(self): return self._tax_rate
+
+    @tax_rate.setter
+    def tax_rate(self, value: float):
+        if type(value) == float: self._tax_rate = value
+        else: raise TypeError("Incorrect type for tax_rate")
+
 class UserGuildSettings():
     instance_counter = 0
 
@@ -451,6 +488,7 @@ class UserGuildSettings():
         self.is_member = is_member
         self.is_dirty = is_dirty
         self.is_deleted = is_deleted
+        
         UserGuildSettings.instance_counter += 1
 
     @classmethod
@@ -1113,6 +1151,126 @@ class ShopItem():
     def role_id(self, value: Union[int, None]):
         if type(value) == int or value is None: self._role_id = value
         else: raise TypeError("Incorrect type for role_id")
+
+    @property
+    def is_dirty(self): return self._is_dirty
+
+    @is_dirty.setter
+    def is_dirty(self, value: bool):
+        if type(value) == bool: self._is_dirty = value
+        else: raise TypeError("Incorrect type for is_dirty")
+
+    @property
+    def is_deleted(self): return self._is_deleted
+
+    @is_deleted.setter
+    def is_deleted(self, value: bool):
+        if type(value) == bool: self._is_deleted = value
+        else: raise TypeError("Incorrect type for is_deleted")
+
+class GlobalShopItem():
+    instance_counter = 0
+
+    __slots__ = (
+        "_item_id",
+        "_name",
+        "_description",
+        "_price",
+        "_item_type",
+        "_metadata",
+        "_is_dirty",
+        "_is_deleted"
+    )
+
+    def __init__(self,
+        item_id: int,
+        name: str,
+        description: str,
+        price: int,
+        item_type: GlobalItemType,
+        metadata: dict,
+        is_dirty: bool,
+        is_deleted: bool
+    ) -> None:
+        self.item_id = item_id
+        self.name = name
+        self.description = description
+        self.price = price
+        self.item_type = item_type
+        self.metadata = metadata if metadata is not None else {}
+        self.is_dirty = is_dirty
+        self.is_deleted = is_deleted
+        GlobalShopItem.instance_counter += 1
+
+    @classmethod
+    def from_dict(cls, data: dict):
+        if type(data) is dict:
+            i_type = data["item_type"]
+            if isinstance(i_type, str):
+                try: i_type = GlobalItemType[i_type]
+                except KeyError: i_type = GlobalItemType(i_type)
+
+            return cls(
+                item_id = data["item_id"],
+                name = data["name"],
+                description = data.get("description", ""),
+                price = data.get("price", 0),
+                item_type = i_type,
+                metadata = data.get("metadata", {}),
+                is_dirty = bool(data.get("is_dirty", False)),
+                is_deleted = bool(data.get("is_deleted", False))
+            )
+
+    def compare(self, model: "GlobalShopItem") -> bool:
+        return type(model) == GlobalShopItem and self.item_id == model.item_id
+
+    @property
+    def item_id(self): return self._item_id
+
+    @item_id.setter
+    def item_id(self, value: int):
+        if type(value) == int: self._item_id = value
+        else: raise TypeError("Incorrect type for item_id")
+
+    @property
+    def name(self): return self._name
+
+    @name.setter
+    def name(self, value: str):
+        if type(value) == str: self._name = value
+        else: raise TypeError("Incorrect type for name")
+
+    @property
+    def description(self): return self._description
+
+    @description.setter
+    def description(self, value: str):
+        if type(value) == str: self._description = value
+        else: raise TypeError("Incorrect type for description")
+
+    @property
+    def price(self): return self._price
+
+    @price.setter
+    def price(self, value: int):
+        if type(value) == int: self._price = value
+        else: raise TypeError("Incorrect type for price")
+
+    @property
+    def item_type(self): return self._item_type
+
+    @item_type.setter
+    def item_type(self, value: GlobalItemType):
+        if type(value) == GlobalItemType: self._item_type = value
+        else: raise TypeError("Incorrect type for item_type")
+
+    @property
+    def metadata(self): return self._metadata
+
+    @metadata.setter
+    def metadata(self, value: dict):
+        if type(value) == dict: self._metadata = value
+        else: raise TypeError("Incorrect type for metadata")
 
     @property
     def is_dirty(self): return self._is_dirty

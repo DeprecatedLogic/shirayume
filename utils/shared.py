@@ -49,6 +49,13 @@ class Table(Enum):
     polls = auto()
     user_economies = auto()
     shop_items = auto()
+    global_shop_items = auto()
+
+class GlobalItemType(Enum):
+    title = auto()
+    color = auto()
+    badge = auto()
+    multiplier = auto()
 
 class Action(Enum):
     """ Defines actions that the discord bot can take. """
