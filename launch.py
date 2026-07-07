@@ -1,7 +1,7 @@
 import os
 import dotenv
 from database import database_manager
-from cogs import moderation, economy, polls, rankings, utilities, web_scraping, statistics
+from cogs import agent, moderation, local_economy as economy, polls, rankings, web_scraping, statistics
 from cogs.admin import utilities as admin_utilities
 from cogs.minigames import basic
 import discord
@@ -97,8 +97,9 @@ async def on_ready() -> None:
         description = f"Bot connected as {shared.SHIRAYUME.user} (ID: {shared.SHIRAYUME.user.id})"
     )
 
+    await agent.setup()
     await moderation.setup()
-    #economy.setup()
+    await economy.setup()
     await polls.setup()
     #rankings.setup()
     #utilities_commands.setup()
