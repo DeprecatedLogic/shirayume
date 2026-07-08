@@ -1,7 +1,7 @@
 import discord
 from discord.ext import commands
 from agent.agent import Agent
-from agent.brain import PlaceholderBrain
+from agent.brain import LlamaCppBrain
 from agent.tool_registry import ToolRegistry
 from agent.tools import delete_message_tool
 from agent.agent_models import MessageDTO
@@ -13,9 +13,10 @@ from utils import shared
 class AgentCog(commands.Cog):
     """
     """ 
-    def __init__(self, conversation_manager, agent):
+    def __init__(self, conversation_manager, agent, tool_registry):
         self._conversation_manager = conversation_manager
         self._agent = agent
+        self._tool_registry = tool_registry
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
@@ -25,30 +26,23 @@ class AgentCog(commands.Cog):
         if not message.content:
             return
 
-        content = message.content.replace(
-            f"<@{shared.SHIRAYUME.user.id}>",
-            ""
-        ).strip()
-
         dto = MessageDTO(
+            message_id=message.id,
             channel_id=message.channel.id,
-            author=message.author.name,
+            author=message.author.display_name,
             role="user",
-            content=content,
+            content=message.content,
         )
 
         self._conversation_manager.add_message(dto)
-        print(dto)
-        if shared.SHIRAYUME.user not in message.mentions:
-            return
 
         history = self._conversation_manager.get_history(message.channel.id)
 
-        response = await self._agent.respond(history)
-        
-        print(response)
-        if response.content:
-            await message.channel.send(response.content)
+        response = await self._agent.respond(history, dto)
+        print(response.moderation_result)
+        print(response.tool_calls)
+        for tool_call in response.tool_calls:
+            await self._tool_registry.execute(tool_call)
 
 async def setup():
     conversation_manager = ConversationManager()
@@ -60,7 +54,7 @@ async def setup():
     registry.register(delete_message_tool)
 
 
-    brain = PlaceholderBrain()
+    brain = LlamaCppBrain(url="http://localhost:8080")
     agent = Agent(brain=brain, tool_registry=registry)
 
     await shared.SHIRAYUME.add_cog(

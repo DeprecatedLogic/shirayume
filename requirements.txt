@@ -2,6 +2,8 @@ aiodns==3.5.0
 aiohappyeyeballs==2.6.1
 aiohttp==3.12.15
 aiosignal==1.4.0
+ansicon==1.89.0
+anyio==4.14.1
 asgiref==3.9.2
 asyncio==4.0.0
 attrs==25.3.0
@@ -16,7 +18,11 @@ colorama==0.4.6
 discord==2.3.2
 discord.py==2.6.3
 frozenlist==1.7.0
+h11==0.16.0
+httpcore==1.0.9
+httpx==0.28.1
 idna==3.10
+jinxed==2.1.0
 multidict==6.6.4
 mysql-connector-python==9.4.0
 propcache==0.3.2
