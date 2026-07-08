@@ -56,11 +56,11 @@ class GlobalEconomyService:
         net_reward = base_reward - tax_amount
 
         user.balance += net_reward
-        user.is_dirty = True
+        database_manager.DB_MANAGER.mark_dirty(shared.Table.users, user)
 
         if guild and tax_amount > 0:
             guild.yume_points += tax_amount
-            guild.is_dirty = True
+            database_manager.DB_MANAGER.mark_dirty(shared.Table.guilds, guild)
 
         return {"success": 1, "taxed": tax_amount, "net": net_reward}
 
@@ -81,7 +81,7 @@ class GlobalEconomyService:
         guild = self._get_guild(guild_id)
         if guild:
             guild.tax_rate = rate
-            guild.is_dirty = True
+            database_manager.DB_MANAGER.mark_dirty(shared.Table.guilds, guild)
             return True
         return False
 
@@ -140,5 +140,5 @@ class GlobalEconomyService:
         if payload_value:
             user.active_items[payload_key] = payload_value
 
-        user.is_dirty = True
+        database_manager.DB_MANAGER.mark_dirty(shared.Table.users, user)
         return {"success": True, "item": item}

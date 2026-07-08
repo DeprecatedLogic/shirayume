@@ -74,7 +74,7 @@ class StatisticsService:
         if not db_guild.stats_channel_ids:
             db_guild.stats_channel_ids = {}
 
-        db_guild.is_dirty = True
+        database_manager.DB_MANAGER.mark_dirty(shared.Table.guilds, db_guild)
         return True
 
     def disable_stats(self, guild_id: int) -> dict:
@@ -100,10 +100,10 @@ class StatisticsService:
         db_guild.stats_enabled = False
         db_guild.stats_category_id = None
         db_guild.stats_channel_ids = {}
-        db_guild.is_dirty = True
+
+        database_manager.DB_MANAGER.mark_dirty(shared.Table.guilds, db_guild)
 
         self.cache.pop(guild_id, None)
-        self.last_update.pop(guild_id, None)
         
         return to_delete
 
@@ -130,7 +130,8 @@ class StatisticsService:
         if db_guild:
             db_guild.stats_category_id = category_id
             db_guild.stats_channel_ids = channel_ids
-            db_guild.is_dirty = True
+
+            database_manager.DB_MANAGER.mark_dirty(shared.Table.guilds, db_guild)
 
     def calculate_stats(self, guild_id: int, total_members: int, member_data: List[Dict[str, bool]]) -> Optional[Dict[str, int]]:
         """
@@ -147,15 +148,6 @@ class StatisticsService:
             Optional[Dict[str, int]]: _description_
         """
         if not self.is_stats_enabled(guild_id):
-            return None
-
-        time_delta = time.time() - self.last_update.get(guild_id, 0)
-        if time_delta < 45:
-            helpers.custom_print(
-                level=shared.LogLevel.DEBUG,
-                function_name="services.StatisticsService.calculate_stats",
-                description=f"Statistics are being rate limited ({time_delta} seconds)"
-            )
             return None
 
         bots = sum(1 for member in member_data if member["is_bot"])
@@ -178,7 +170,6 @@ class StatisticsService:
             return None
 
         self.cache[guild_id] = stats
-        self.last_update[guild_id] = time.time()
         return stats
 
     def get_expected_names(self, stats: Dict[str, int]) -> Dict[str, str]:

@@ -1,4 +1,4 @@
-from typing import List, Dict, Union
+from typing import List, Dict, Union, Optional
 from datetime import datetime
 import json
 from utils.shared import Action, GlobalItemType
@@ -199,8 +199,8 @@ class Guild():
         is_dirty: bool,
         is_deleted: bool,
         stats_enabled: bool = False,
-        stats_category_id: Union[int, None] = None,
-        stats_channel_ids: dict = None,
+        stats_category_id: Optional[int] = None,
+        stats_channel_ids: dict = {},
         economy_enabled: bool = False,
         base_message_reward: int = 0,
         currency: str = "Credits",
@@ -224,7 +224,7 @@ class Guild():
 
         self.stats_enabled = stats_enabled
         self.stats_category_id = stats_category_id
-        self.stats_channel_ids = stats_channel_ids if stats_channel_ids is not None else {}
+        self.stats_channel_ids = stats_channel_ids
         
         self.economy_enabled = economy_enabled
         self.base_message_reward = base_message_reward
@@ -252,7 +252,7 @@ class Guild():
                 updated_at = data.get("updated_at", data["created_at"]),
                 stats_enabled = bool(data.get("stats_enabled", False)),
                 stats_category_id = data.get("stats_category_id", None),
-                stats_channel_ids = data.get("stats_channel_ids", {}),
+                stats_channel_ids = json.loads(data["stats_channel_ids"]) if isinstance(data.get("stats_channel_ids"), str) else data.get("stats_channel_ids", {}),
                 economy_enabled = bool(data.get("economy_enabled", False)),
                 base_message_reward = data.get("base_message_reward", 0),
                 currency = data.get("currency", "Credits"),
@@ -995,7 +995,7 @@ class UserEconomy():
                 guild_id = data["guild_id"],
                 user_id = data["user_id"],
                 local_balance = data["local_balance"],
-                last_message_reward_time = data.get("last_message_reward_time", None),
+                last_message_reward_time = data["last_message_reward_time"],
                 is_dirty = bool(data.get("is_dirty", False)),
                 is_deleted = bool(data.get("is_deleted", False))
             )
@@ -1216,7 +1216,7 @@ class GlobalShopItem():
                 description = data.get("description", ""),
                 price = data.get("price", 0),
                 item_type = i_type,
-                metadata = data.get("metadata", {}),
+                metadata = json.loads(data["metadata"]) if isinstance(data.get("metadata"), str) else data.get("metadata", {}),
                 is_dirty = bool(data.get("is_dirty", False)),
                 is_deleted = bool(data.get("is_deleted", False))
             )

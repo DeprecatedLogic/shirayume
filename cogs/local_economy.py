@@ -248,7 +248,7 @@ class LocalEconomy(commands.Cog):
         await interaction.followup.send(embed=embed, ephemeral=True)
 
     @commands.guild_only()
-    @app_commands.command(name="shop", description="View the local server shop")
+    @app_commands.command(name="shop_local", description="View the local server shop")
     async def view_shop(self, interaction: discord.Interaction) -> None:
         """
         Displays available items for purchase using a paginated view.
@@ -276,7 +276,7 @@ class LocalEconomy(commands.Cog):
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
     @commands.guild_only()
-    @app_commands.command(name="buy", description="Purchase an item from the shop")
+    @app_commands.command(name="buy_local", description="Purchase an item from the local shop")
     async def buy_item(self, interaction: discord.Interaction, item_name: str) -> None:
         """
         Initiates a purchase. Atomically checks balance, deducts funds, 
@@ -339,7 +339,7 @@ class LocalEconomy(commands.Cog):
 
         await interaction.followup.send(embed=embed, ephemeral=True)
 
-    @app_commands.command(name="addmoney", description="[Admin] Add money to a user's balance")
+    @app_commands.command(name="add_money", description="[Admin] Add money to a user's balance")
     @app_commands.checks.has_permissions(administrator=True)
     async def admin_add_money(self, interaction: discord.Interaction, member: discord.Member, amount: int) -> None:
         """
@@ -369,8 +369,9 @@ class LocalEconomy(commands.Cog):
             )
 
             try:
-                receiver_channel = member.dm_channel or await member.create_dm()
-                await receiver_channel.send(embed=receiver_embed)
+                if not member.bot:
+                    receiver_channel = member.dm_channel or await member.create_dm()
+                    await receiver_channel.send(embed=receiver_embed)
             except discord.Forbidden:
                 pass # Silently ignore if user has DMs disabled
                 
@@ -385,8 +386,7 @@ class LocalEconomy(commands.Cog):
 
 async def setup() -> None:
     if shared.GLOBAL_CONFIG["features"]["economy"]["local"]["is_enabled"]:
-        if "LocalEconomy" not in shared.SHIRAYUME.cogs:
-            await shared.SHIRAYUME.add_cog(LocalEconomy())
+        await shared.SHIRAYUME.add_cog(LocalEconomy(), override=True)
     else:
         helpers.custom_print(
             level=shared.LogLevel.INFO,

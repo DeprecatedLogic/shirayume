@@ -100,7 +100,7 @@ class EconomyService:
             return 0
             
         record.local_balance += amount
-        record.is_dirty = True
+        database_manager.DB_MANAGER.mark_dirty(shared.Table.user_economies, record)
         return record.local_balance
 
     def remove_balance(self, guild_id: int, user_id: int, amount: int) -> bool:
@@ -123,7 +123,7 @@ class EconomyService:
             return False
             
         record.local_balance -= amount
-        record.is_dirty = True
+        database_manager.DB_MANAGER.mark_dirty(shared.Table.user_economies, record)
         return True
 
     def transfer_funds(self, guild_id: int, sender_id: int, receiver_id: int, amount: int) -> bool:
@@ -179,7 +179,7 @@ class EconomyService:
             return 0
             
         record.last_message_reward_time = now
-        record.is_dirty = True
+        database_manager.DB_MANAGER.mark_dirty(shared.Table.user_economies, record)
         self.add_balance(guild_id, user_id, reward)
         
         return reward
@@ -222,8 +222,9 @@ class EconomyService:
             str: The name of the currency, defaulting to "Credits".
         """
         db_guild = self._get_db_guild(guild_id)
-        if db_guild and getattr(db_guild, "currency_name", None):
-            return db_guild.currency_name
+        if db_guild:
+            return getattr(db_guild, "currency", "Credits")
+        # todo: if no guild, ADD the guild ?!
         return "Credits"
 
     def purchase_item(self, guild_id: int, user_id: int, item_name: str) -> Dict[str, Any]:

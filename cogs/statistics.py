@@ -5,10 +5,16 @@ from typing import Literal
 import asyncio
 from utils import shared, helpers
 from services import statistics
+import time
+from typing import Optional
 
 class Statistics(commands.Cog):
     def __init__(self):
         self.stats = statistics.StatisticsService()
+        self.pending_updates = {} # guild_id: delayed sync task
+        self.last_enable = {} # guild_id: timestamp
+        self.update_delay = 120 # seconds
+        self.enable_delay = 180 # seconds
 
     def _extract_member_data(self, guild: discord.Guild) -> list:
         """Converts Discord Member objects into raw data dicts for the service layer."""
@@ -81,19 +87,69 @@ class Statistics(commands.Cog):
 
         return True
 
-    @commands.Cog.listener()
-    async def on_member_join(self, member: discord.Member):
-        await self._sync_channels(member.guild)
-
-    @commands.Cog.listener()
-    async def on_member_remove(self, member: discord.Member):
-        await self._sync_channels(member.guild)
-
-    @commands.Cog.listener()
-    async def on_presence_update(self, before, after):
-        if after.bot:
+    async def _delayed_sync(self, guild: discord.Guild) -> None:
+        try:
+            await asyncio.sleep(self.update_delay)
+            await self._sync_channels(guild)
+        except asyncio.CancelledError:
             return
-        await self._sync_channels(after.guild)
+        finally:
+            self.pending_updates.pop(guild.id, None)
+
+    @commands.Cog.listener()
+    async def on_member_join(self, member: discord.Member) -> None:
+        """
+        _summary_
+
+        Args:
+            member (discord.Member): _description_
+        """
+        guild = after.guild
+
+        if not self.stats.is_stats_enabled(guild.id):
+            return
+        
+        if guild.id not in self.pending_updates:
+            self.pending_updates[guild.id] = asyncio.create_task(
+                self._delayed_sync(guild)
+            )
+
+    @commands.Cog.listener()
+    async def on_member_remove(self, member: discord.Member) -> None:
+        """
+        _summary_
+
+        Args:
+            member (discord.Member): _description_
+        """
+        guild = after.guild
+
+        if not self.stats.is_stats_enabled(guild.id):
+            return
+        
+        if guild.id not in self.pending_updates:
+            self.pending_updates[guild.id] = asyncio.create_task(
+                self._delayed_sync(guild)
+            )
+
+    @commands.Cog.listener()
+    async def on_presence_update(self, before, after) -> None:
+        """
+        _summary_
+
+        Args:
+            before (_type_): _description_
+            after (_type_): _description_
+        """
+        guild = after.guild
+
+        if not self.stats.is_stats_enabled(guild.id):
+            return
+        
+        if guild.id not in self.pending_updates:
+            self.pending_updates[guild.id] = asyncio.create_task(
+                self._delayed_sync(guild)
+            )
 
     @app_commands.command(name="yumestats", description="Enable or disable server statistics")
     @app_commands.checks.has_permissions(administrator=True)
@@ -101,8 +157,22 @@ class Statistics(commands.Cog):
         await interaction.response.defer(ephemeral=False)
         
         if action == "enable":
+            last_timestamp = self.last_enable.get(interaction.guild_id, None)
+            elapsed = time.monotonic() - last_timestamp if last_timestamp else self.enable_delay
+
+            if elapsed < self.enable_delay:
+                embed = helpers.embed_generator(
+                    title="Statistics",
+                    description=f"Please wait {self.enable_delay - elapsed} before enabling server statistics again.",
+                    color=discord.Color.orange()
+                )
+                interaction.followup.send(embed=embed)
+                return
+
             success = self.stats.enable_stats(interaction.guild_id)
             if success and await self._sync_channels(interaction.guild):
+                self.last_enable[interaction.guild_id] = time.monotonic()
+
                 embed = helpers.embed_generator(
                     title="Statistics",
                     description="Server statistics have been **enabled** and initialized.",
@@ -131,6 +201,11 @@ class Statistics(commands.Cog):
                     if category:
                         await category.delete(reason="Statistics disabled")
 
+                # Cancel pending update
+                task = self.pending_updates.pop(interaction.guild_id, None)
+                if task:
+                    task.cancel()
+
                 embed = helpers.embed_generator(
                     title="Statistics",
                     description="Server statistics have been **disabled**.",
@@ -150,6 +225,5 @@ async def setup():
     
     for guild in shared.SHIRAYUME.guilds:
         shared.SHIRAYUME.loop.create_task(stats_cog._sync_channels(guild))
-
-    if "Statistics" not in shared.SHIRAYUME.cogs:
-        await shared.SHIRAYUME.add_cog(stats_cog)
+    
+    await shared.SHIRAYUME.add_cog(stats_cog, override=True)

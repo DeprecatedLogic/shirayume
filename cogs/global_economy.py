@@ -56,7 +56,7 @@ class GlobalShopPaginator(View):
         embed = helpers.embed_generator(title="Global Shop", description="Closed.")
         await interaction.response.edit_message(embed=embed, view=None)
 
-class GlobalEconomy(commands.GroupCog, group_name="global"):
+class GlobalEconomy(commands.Cog):
     """
     Commands for the overarching Global Economy and Guild Prestige.
     """
@@ -87,7 +87,7 @@ class GlobalEconomy(commands.GroupCog, group_name="global"):
         
         await interaction.response.send_message(embed=embed)
 
-    @app_commands.command(name="shop", description="Browse the Global Shop")
+    @app_commands.command(name="shop_global", description="Browse the Global Shop")
     async def global_shop(self, interaction: discord.Interaction) -> None:
         items = self.service.get_global_shop_items()
         if not items:
@@ -98,7 +98,7 @@ class GlobalEconomy(commands.GroupCog, group_name="global"):
         view = GlobalShopPaginator(items)
         await interaction.response.send_message(embed=view.generate_embed(), view=view)
 
-    @app_commands.command(name="buy", description="Purchase and equip an item from the Global Shop")
+    @app_commands.command(name="buy_global", description="Purchase and equip an item from the Global Shop")
     async def buy_item(self, interaction: discord.Interaction, item_id: int) -> None:
         result = self.service.purchase_global_item(interaction.user.id, item_id)
         
@@ -115,7 +115,7 @@ class GlobalEconomy(commands.GroupCog, group_name="global"):
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    @app_commands.command(name="settax", description="[Admin] Set the Guild's Yume Coin tax rate (0 to 30)")
+    @app_commands.command(name="set_tax", description="[Admin] Set the Guild's Yume Coin tax rate (0 to 30)")
     @app_commands.checks.has_permissions(administrator=True)
     async def set_tax(self, interaction: discord.Interaction, percentage: int) -> None:
         if not (0 <= percentage <= 30):
@@ -148,8 +148,7 @@ class GlobalEconomy(commands.GroupCog, group_name="global"):
 
 async def setup() -> None:
     if shared.GLOBAL_CONFIG["features"]["economy"]["global"]["is_enabled"]:
-        if "GlobalEconomy" not in shared.SHIRAYUME.cogs:
-            await shared.SHIRAYUME.add_cog(GlobalEconomy())
+        await shared.SHIRAYUME.add_cog(GlobalEconomy(), override=True)
     else:
         helpers.custom_print(
             level=shared.LogLevel.INFO,
