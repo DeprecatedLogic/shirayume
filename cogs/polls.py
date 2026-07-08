@@ -666,5 +666,4 @@ class Poll(commands.Cog):
             )
 
 async def setup() -> None:
-    if "Poll" not in shared.SHIRAYUME.cogs:
-        await shared.SHIRAYUME.add_cog(Poll())
+    await shared.SHIRAYUME.add_cog(Poll(), override=True)

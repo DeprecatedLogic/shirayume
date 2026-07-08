@@ -8,6 +8,5 @@ class Rankings(commands.Cog):
     def __init__(self):
         self.users = []
 
-async def setup(config: dict):
-    if "Rankings" not in shared.SHIRAYUME.cogs:
-        await shared.SHIRAYUME.add_cog(Rankings(config))
+async def setup():
+    await shared.SHIRAYUME.add_cog(Rankings(), override=True)

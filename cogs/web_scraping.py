@@ -90,5 +90,4 @@ class WebScraping(commands.Cog):
             )
 
 async def setup():
-    if "WebScraping" not in shared.SHIRAYUME.cogs:
-        await shared.SHIRAYUME.add_cog(WebScraping())
+    await shared.SHIRAYUME.add_cog(WebScraping(), override=True)

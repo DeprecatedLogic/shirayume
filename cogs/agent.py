@@ -63,7 +63,7 @@ async def setup():
     brain = PlaceholderBrain()
     agent = Agent(brain=brain, tool_registry=registry)
 
-    if "AgentCog" not in shared.SHIRAYUME.cogs:
-        await shared.SHIRAYUME.add_cog(
-            AgentCog(conversation_manager, agent)
-        )
+    await shared.SHIRAYUME.add_cog(
+        AgentCog(conversation_manager, agent),
+        override=True
+    )

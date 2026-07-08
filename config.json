@@ -31,11 +31,11 @@
         },
         "economy": {
             "local": {
-                "is_enabled": false,
+                "is_enabled": true,
                 "shop_enabled": true
             },
             "global": {
-                "is_enabled": false,
+                "is_enabled": true,
                 "shop_enabled": true,
                 "min_tax": 0,
                 "max_tax": 30
@@ -68,6 +68,9 @@
                 "inactive": "Inactive Members: {}",
                 "bots": "Bots: {}"
             }
+        },
+        "agent": {
+            "is_enabled": true
         }
     }
 }
