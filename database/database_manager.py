@@ -112,7 +112,7 @@ class DatabaseManager:
 
         return tuple(getattr(obj,pk) for pk in pkeys)
 
-    def _mark_dirty(self, table, obj) -> None:
+    def mark_dirty(self, table, obj) -> None:
         """_summary_
 
         Args:
@@ -122,13 +122,13 @@ class DatabaseManager:
         obj.is_dirty = True
         self._dirty[table].add(obj)
 
-    def _add(self, table, items, mark_dirty: bool = True) -> None:
+    def _add(self, table, items, set_dirty: bool = True) -> None:
         """_summary_
 
         Args:
             table (_type_): _description_
             items (_type_): _description_
-            mark_dirty (bool): _description_
+            set_dirty (bool): _description_
         """
         if not isinstance(items, list):
             items = [items]
@@ -146,8 +146,8 @@ class DatabaseManager:
             storage.append(item)
             index[key] = item
 
-            if mark_dirty:
-                self._mark_dirty(table, item)
+            if set_dirty:
+                self.mark_dirty(table, item)
 
     def _remove(self, table, key) -> None:
         """_summary_
@@ -160,7 +160,7 @@ class DatabaseManager:
 
         if obj:
             obj.is_deleted = True
-            self._mark_dirty(table, obj)
+            self.mark_dirty(table, obj)
 
     def _initialize_schema(self) -> None:
         """ _summary_ """
@@ -299,7 +299,7 @@ class DatabaseManager:
         if ugs:
             ugs.is_member = True
             ugs.is_deleted = False # just in case (normally we do NOT delete links between users and guilds to keep their old data intact)
-            self._mark_dirty(shared.Table.user_guild_settings, ugs)
+            self.mark_dirty(shared.Table.user_guild_settings, ugs)
             return
         
         self.add_user_guild_settings(
@@ -323,7 +323,7 @@ class DatabaseManager:
 
         if ugs and ugs.is_member:
             ugs.is_member = False
-            self._mark_dirty(shared.Table.user_guild_settings, ugs)
+            self.mark_dirty(shared.Table.user_guild_settings, ugs)
 
 
     def get_users_mod_logs(self, user_ids: Union[List[int], int]) -> List[models.ModerationLog]:
@@ -500,7 +500,7 @@ class DatabaseManager:
 
             self._dirty[table].clear()
 
-    def database_commit(self)->None:
+    async def database_commit(self)->None:
         """
         Efficiently executes all pending dirty state changes into the database.
         """
@@ -650,7 +650,7 @@ def setup(DB_HOST: str, DB_USER: str, DB_PASSWORD: str, DATABASE: str) -> None:
                 if model:
                     models_list.append(model)
             
-            DB_MANAGER._add(table, models_list, mark_dirty=False)
+            DB_MANAGER._add(table, models_list, set_dirty=False)
             
             helpers.custom_print(
                 level = shared.LogLevel.DEBUG,
