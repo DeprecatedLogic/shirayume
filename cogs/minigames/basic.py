@@ -224,3 +224,8 @@ class Minigames(commands.Cog):
 
 async def setup():
     await shared.SHIRAYUME.add_cog(Minigames())
+    helpers.custom_print(
+        level=shared.LogLevel.DEBUG,
+        function_name="cogs.minigames.basic.setup",
+        description="Setup completed successfully"
+    )

@@ -7,7 +7,7 @@ from agent.tools import delete_message_tool
 from agent.agent_models import MessageDTO
 from agent.context import DiscordToolContext
 from agent.conversation_manager import ConversationManager
-from utils import shared
+from utils import shared, helpers
 
 
 class AgentCog(commands.Cog):
@@ -58,6 +58,11 @@ async def setup():
     agent = Agent(brain=brain, tool_registry=registry)
 
     await shared.SHIRAYUME.add_cog(
-        AgentCog(conversation_manager, agent),
+        AgentCog(conversation_manager, agent, registry),
         override=True
+    )
+    helpers.custom_print(
+        level=shared.LogLevel.DEBUG,
+        function_name="cogs.agent.setup",
+        description="Setup completed successfully"
     )

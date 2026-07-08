@@ -149,6 +149,11 @@ class GlobalEconomy(commands.Cog):
 async def setup() -> None:
     if shared.GLOBAL_CONFIG["features"]["economy"]["global"]["is_enabled"]:
         await shared.SHIRAYUME.add_cog(GlobalEconomy(), override=True)
+        helpers.custom_print(
+            level=shared.LogLevel.DEBUG,
+            function_name="cogs.global_economy.setup",
+            description="Setup completed successfully"
+        )
     else:
         helpers.custom_print(
             level=shared.LogLevel.INFO,

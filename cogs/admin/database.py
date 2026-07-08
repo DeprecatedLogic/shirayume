@@ -1,6 +1,6 @@
 from discord.ext import tasks, commands
 from database import database_manager
-from utils import shared
+from utils import shared, helpers
 
 class BackupManager(commands.Cog):
     def __init__(self) -> None:
@@ -48,3 +48,8 @@ class BackupManager(commands.Cog):
 
 async def setup() -> None:
     await shared.SHIRAYUME.add_cog(BackupManager(), override=True)
+    helpers.custom_print(
+        level=shared.LogLevel.DEBUG,
+        function_name="cogs.admin.database.setup",
+        description="Setup completed successfully"
+    )

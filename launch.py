@@ -15,8 +15,6 @@ from typing import List
 from time import sleep
 import asyncio
 
-shared.SHIRAYUME = commands.Bot("!>", intents = discord.Intents.all(), help_command=None)
-
 def get_new_year() -> datetime:
     """ Get new year's datetime. """
 
@@ -91,56 +89,59 @@ async def setup_bot() -> None:
     
     DB_MANAGER.add_guilds(guilds)
 
-@shared.SHIRAYUME.event
-async def on_ready() -> None:
-    helpers.custom_print(
-        level = shared.LogLevel.INFO,
-        function_name = "launch.on_ready",
-        description = f"Bot connected as {shared.SHIRAYUME.user} (ID: {shared.SHIRAYUME.user.id})"
-    )
+class ShirayumeBot(commands.Bot):
+    def __init__(self):
+        intents = discord.Intents.all()
 
-    await admin_utilities.setup()
-    await admin_database.setup()
-    
-    await agent.setup()
-    await moderation.setup()
-    await local_economy.setup()
-    await global_economy.setup()
-    await polls.setup()
-    #rankings.setup()
-    #utilities_commands.setup()
-    #web_scraping_commands.setup()
-    await basic.setup()
-    await statistics.setup()
+        super().__init__(
+            command_prefix="!>",
+            intents=intents,
+            help_command=None
+        )
 
-    helpers.custom_print(
-        level = shared.LogLevel.INFO,
-        function_name = "launch.on_ready",
-        description = "All cogs have been set up."
-    )
-    helpers.custom_print(
-        level = shared.LogLevel.INFO,
-        function_name = "launch.on_ready",
-        description = "Starting command sync..."
-    )
-    try:
-        #GUILD_ID = 1183463468020531343
-        #synced_guild = await shared.SHIRAYUME.tree.sync(guild = shared.SHIRAYUME.get_guild(GUILD_ID))
-        #print(f"Synced {len(synced_guild)} commands to guild {shared.SHIRAYUME.get_guild(GUILD_ID).name}")
-        synced_globally = await shared.SHIRAYUME.tree.sync()
+    async def setup_hook(self):
+        await admin_utilities.setup()
+        await admin_database.setup()
+
+        await agent.setup()
+        await moderation.setup()
+        await local_economy.setup()
+        await global_economy.setup()
+        await polls.setup()
+        await statistics.setup()
+        #rankings.setup()
+        #web_scraping.setup()
+        await basic.setup()
+
+        try:
+            #GUILD_ID = 1183463468020531343
+            #synced_guild = await shared.SHIRAYUME.tree.sync(guild = shared.SHIRAYUME.get_guild(GUILD_ID))
+            #print(f"Synced {len(synced_guild)} commands to guild {shared.SHIRAYUME.get_guild(GUILD_ID).name}")
+            synced = await self.tree.sync()
+
+            helpers.custom_print(
+                level=shared.LogLevel.INFO,
+                function_name="ShirayumeBot.setup_hook",
+                description=f"Synced {len(synced)} commands globally."
+            )
+
+        except Exception as e:
+            helpers.custom_print(
+                level=shared.LogLevel.ERROR,
+                function_name="ShirayumeBot.setup_hook",
+                description=f"Failed to sync commands: {e}"
+            )
+
+    async def on_ready(self):
         helpers.custom_print(
-            level = shared.LogLevel.INFO,
-            function_name = "launch.on_ready",
-            description = f"Synced {len(synced_globally)} commands globally."
+            level=shared.LogLevel.INFO,
+            function_name="ShirayumeBot.on_ready",
+            description=f"Connected as {self.user} (ID: {self.user.id})"
         )
-    except Exception as e:
-        helpers.custom_print(
-            level = shared.LogLevel.ERROR,
-            function_name = "launch.on_ready",
-            description = f"Failed to sync commands: {e}"
-        )
-    
-    await setup_bot()
+
+        await setup_bot()
+
+shared.SHIRAYUME = ShirayumeBot()
 
 async def launch() -> None:
 

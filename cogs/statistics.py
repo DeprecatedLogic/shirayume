@@ -163,10 +163,10 @@ class Statistics(commands.Cog):
             if elapsed < self.enable_delay:
                 embed = helpers.embed_generator(
                     title="Statistics",
-                    description=f"Please wait {self.enable_delay - elapsed} before enabling server statistics again.",
+                    description=f"Please wait {int(self.enable_delay - elapsed)} seconds before enabling server statistics again.",
                     color=discord.Color.orange()
                 )
-                interaction.followup.send(embed=embed)
+                await interaction.followup.send(embed=embed)
                 return
 
             success = self.stats.enable_stats(interaction.guild_id)
@@ -227,3 +227,8 @@ async def setup():
         shared.SHIRAYUME.loop.create_task(stats_cog._sync_channels(guild))
     
     await shared.SHIRAYUME.add_cog(stats_cog, override=True)
+    helpers.custom_print(
+        level=shared.LogLevel.DEBUG,
+        function_name="cogs.statistics.setup",
+        description="Setup completed successfully"
+    )

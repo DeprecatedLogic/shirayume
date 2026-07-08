@@ -667,3 +667,8 @@ class Poll(commands.Cog):
 
 async def setup() -> None:
     await shared.SHIRAYUME.add_cog(Poll(), override=True)
+    helpers.custom_print(
+        level=shared.LogLevel.DEBUG,
+        function_name="cogs.polls.setup",
+        description="Setup completed successfully"
+    )

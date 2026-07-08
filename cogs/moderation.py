@@ -372,3 +372,8 @@ class Moderation(commands.Cog):
 
 async def setup():
     await shared.SHIRAYUME.add_cog(Moderation(), override=True)
+    helpers.custom_print(
+        level=shared.LogLevel.DEBUG,
+        function_name="cogs.moderation.setup",
+        description="Setup completed successfully"
+    )
