@@ -594,12 +594,12 @@ class DatabaseManager:
             self.db_connection.rollback()
             raise
 
-    def database_close(self) -> None:
+    async def database_close(self) -> None:
         """
         Commits pending changes and gracefully closes the database connection.
         """
         try:
-            self.database_commit()  
+            await self.database_commit()  
             self.db_shirayume.close()
             self.db_connection.close()
         except mysql.connector.Error as e:

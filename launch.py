@@ -12,6 +12,8 @@ from utils import shared, helpers
 from database import database_manager, models
 from datetime import datetime
 from typing import List
+from time import sleep
+import asyncio
 
 shared.SHIRAYUME = commands.Bot("!>", intents = discord.Intents.all(), help_command=None)
 
@@ -140,7 +142,7 @@ async def on_ready() -> None:
     
     await setup_bot()
 
-def launch() -> None:
+async def launch() -> None:
 
     with open("config.json", "r") as config_file:
         config: dict = json.load(config_file)
@@ -185,7 +187,22 @@ def launch() -> None:
         """
     )
     database_manager.setup(DB_HOST, DB_USER, DB_PASSWORD, DATABASE)
-    shared.SHIRAYUME.run(DISCORD_TOKEN, reconnect = True)
+
+    try:
+        await shared.SHIRAYUME.start(DISCORD_TOKEN, reconnect=True)
+    finally:
+        await shared.SHIRAYUME.close()
+        helpers.custom_print(
+            level = shared.LogLevel.INFO,
+            function_name = "launch",
+            description = f"Shirayume shutdown successfully"
+        )
+        await database_manager.DB_MANAGER.database_close()
+        helpers.custom_print(
+            level = shared.LogLevel.INFO,
+            function_name = "launch",
+            description = f"Database connection closed gracefully"
+        )
 
 if __name__ == "__main__":
-    launch()
+    asyncio.run(launch())

@@ -8,32 +8,24 @@ from database.database_manager import DB_MANAGER
 import asyncio
 
 class Admin(commands.Cog):
+
     @commands.is_owner()
-    @commands.command("shutdown")
-    async def shutdown(ctx: commands.Context) -> None:
+    @commands.command(name="shutdown")
+    async def shutdown(self, ctx: commands.Context, delay: int = 0) -> None:
         """ Disconnects bot by closing the client."""
 
         embed = helpers.embed_generator(
                 title = "Shutting Down",
-                description = "Vanishing into the void... If I don't return, delete my browser history. :saluting_face:",
+                description = "Vanishing into the void... Please, delete my browser history. :saluting_face:",
                 color = (205, 85, 0)
             )
-        ctx.send(embed=embed)
-        
+        await ctx.send(embed=embed)
         await shared.SHIRAYUME.close()
-        await asyncio.sleep(10)
-        DB_MANAGER.database_commit()
-
-        helpers.custom_print(
-            level = shared.LogLevel.INFO,
-            function_name = "on_guild_join",
-            description = f"Bot was shutdown by {ctx.message.author.name}"
-        )
 
     @commands.guild_only()
     @commands.is_owner()
-    @commands.command("sync")
-    async def sync(ctx: commands.Context, guilds: commands.Greedy[discord.Object],
+    @commands.command(name="sync")
+    async def sync(self, ctx: commands.Context, guilds: commands.Greedy[discord.Object],
                 spec: Optional[Literal["~", "*", "^"]] = None) -> None:
         """ Syncs commands based on spec.
         
@@ -95,8 +87,8 @@ class Admin(commands.Cog):
         )
         await ctx.send(embed=embed)
 
-    @commands.command("help")
-    async def help(ctx: commands.Context, args: str = None) -> None:
+    @commands.command(name="help")
+    async def help(self, ctx: commands.Context, args: str = None) -> None:
         """ Help Command.
         
         Parameters
@@ -159,8 +151,8 @@ class Admin(commands.Cog):
         await ctx.send(embed = embed)
 
     @commands.is_owner()
-    @commands.command("upload_pfp")
-    async def upload_pfp(ctx: commands.Context, image_path: str = None) -> None:
+    @commands.command(name="upload_pfp")
+    async def upload_pfp(self, ctx: commands.Context, image_path: str = None) -> None:
         """ Uploads a profile picture for the bot.
         
         Parameters
@@ -266,7 +258,7 @@ class Admin(commands.Cog):
 
     @commands.is_owner()
     @commands.command(name="upload_banner")
-    async def upload_banner(ctx: commands.Context, image_path: str = None) -> None:
+    async def upload_banner(self, ctx: commands.Context, image_path: str = None) -> None:
         """ Uploads a banner for the bot.
         
         Parameters
