@@ -1,8 +1,8 @@
 import os
 import dotenv
 from database import database_manager
-from cogs import agent, moderation, local_economy as economy, polls, rankings, web_scraping, statistics
-from cogs.admin import utilities as admin_utilities
+from cogs import agent, moderation, local_economy, global_economy, polls, rankings, web_scraping, statistics
+from cogs.admin import utilities as admin_utilities, database as admin_database
 from cogs.minigames import basic
 import discord
 from discord.ext import commands
@@ -97,9 +97,13 @@ async def on_ready() -> None:
         description = f"Bot connected as {shared.SHIRAYUME.user} (ID: {shared.SHIRAYUME.user.id})"
     )
 
+    await admin_utilities.setup()
+    await admin_database.setup()
+    
     await agent.setup()
     await moderation.setup()
-    await economy.setup()
+    await local_economy.setup()
+    await global_economy.setup()
     await polls.setup()
     #rankings.setup()
     #utilities_commands.setup()
@@ -181,7 +185,6 @@ def launch() -> None:
         """
     )
     database_manager.setup(DB_HOST, DB_USER, DB_PASSWORD, DATABASE)
-    admin_utilities.setup()
     shared.SHIRAYUME.run(DISCORD_TOKEN, reconnect = True)
 
 if __name__ == "__main__":

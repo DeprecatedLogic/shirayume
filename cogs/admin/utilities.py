@@ -418,5 +418,5 @@ class Admin(commands.Cog):
                 end = '\n'
             )
 
-def setup() -> None:
+async def setup() -> None:
     await shared.SHIRAYUME.add_cog(Admin(), override=True)
