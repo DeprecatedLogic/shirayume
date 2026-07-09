@@ -66,9 +66,9 @@ class Minigames(commands.Cog):
 
             if result == "win":
                 embed = helpers.embed_generator(
-                    title = "Guess the number",
-                    description = f"🎉 Congrats {interaction.user.mention}! You guessed the number: **{self.game.answer}**.\n\n{self.game.summary()}",
-                    color = (0, 191, 255)
+                    title="Guess the number",
+                    description=f"Congrats {interaction.user.mention}! You guessed the number: **{self.game.answer}**.\n\n{self.game.summary()}",
+                    
                 )
 
                 if self.message:
@@ -78,15 +78,15 @@ class Minigames(commands.Cog):
                 return
 
             if result == "bigger":
-                hint = "⬆️ The number is bigger than your guess."
+                hint = "⬆️ The number is **bigger** than your guess."
             else:
-                hint = "⬇️ The number is smaller than your guess."
+                hint = "⬇️ The number is **smaller** than your guess."
 
             if self.game.out_of_attempts():
                 embed = helpers.embed_generator(
-                    title = "Guess the number",
-                    description = f"❌ Game over, no attempts left. The number was **{self.game.answer}**.\n\n{self.game.summary()}",
-                    color = (0, 191, 255)
+                    title="Guess the number",
+                    description=f"**Game over**, no attempts left. The number was **{self.game.answer}**.\n\n{self.game.summary()}",
+                    
                 )
                 if self.message:
                     await self.message.edit(embed = embed, view = None)
@@ -95,18 +95,18 @@ class Minigames(commands.Cog):
                 return
 
             embed = helpers.embed_generator(
-                title = "Guess the number",
-                description = f"{hint}\n\n{self.game.summary()}",
-                color = (0, 191, 255)
+                title="Guess the number",
+                description=f"{hint}\n\n{self.game.summary()}",
+                
             )
             if self.message:
                 await self.message.edit(embed = embed, view = self)
 
         async def _end_game(self, interaction: discord.Interaction, ended_by_user: bool = False):
             embed = helpers.embed_generator(
-                title = "Guess the number",
-                description = f"⛔ Game forcefully ended by player." if ended_by_user else "Game concluded due to timeout.",
-                color = (0, 191, 255)
+                title="Guess the number",
+                description=f"Game forcefully ended by player." if ended_by_user else "Game concluded due to timeout.",
+                
             )
             if self.message:
                 await self.message.edit(embed = embed, view = None)
@@ -116,9 +116,9 @@ class Minigames(commands.Cog):
 
         async def on_timeout(self):
             embed = helpers.embed_generator(
-                title = "Guess the number",
-                description = f"⌛ {self.game.user_id}, game timed out.",
-                color = (0, 191, 255)
+                title="Guess the number",
+                description=f"⌛ {shared.SHIRAYUME.get_user(self.game.user_id).mention}, game timed out.",
+                
             )
             try:
                 if self.message:
@@ -138,43 +138,43 @@ class Minigames(commands.Cog):
                 pass
 
 
-    @app_commands.command(name = "yumecoinflip", description = "Flip a coin!")
+    @app_commands.command(name="yumecoinflip", description="Flip a coin!")
     async def coin_flip(self, interaction: discord.Interaction):
         try:   
             embed = helpers.embed_generator(
-                    title = "Coinflip",
-                    description = f"{interaction.user.mention} got {choice(list(shared.CoinFlip)).name.capitalize()}!",
-                    color = (0, 191, 255)
+                    title="Coinflip",
+                    description=f"{interaction.user.mention} got {choice(list(shared.CoinFlip)).name.capitalize()}!",
+                    
                 )
             await interaction.response.send_message(embed = embed)
 
         except Exception as e:
             embed = helpers.embed_generator(
-                title = "Coinflip",
-                description = "[ERROR] Instead of flipping a coin, how about i flip you instead?",
+                title="Coinflip",
+                description="[ERROR] Instead of flipping a coin, how about i flip you instead?",
             )
             await interaction.response.send_message(embed = embed, ephemeral=True)
 
 
-    @app_commands.command(name = "yumerolldice", description = "Roll a custom sized dice!")
+    @app_commands.command(name="yumerolldice", description="Roll a custom sized dice!")
     async def roll_dice(self, interaction: discord.Interaction, sides: int = 6):
         try:   
             embed = helpers.embed_generator(
-                    title = "Dice roll",
-                    description = f"{interaction.user.mention} rolled {randint(0, sides)} from a {sides} sided dice!",
-                    color = (0, 191, 255)
+                    title="Dice roll",
+                    description=f"{interaction.user.mention} rolled {randint(0, sides)} from a {sides} sided dice!",
+                    
                 )
             await interaction.response.send_message(embed = embed)
 
         except Exception as e:
             embed = helpers.embed_generator(
-                title = "Dice roll",
-                description = "[ERROR] You don't have dices at home?",
+                title="Dice roll",
+                description="[ERROR] You don't have dices at home?",
             )
             await interaction.response.send_message(embed = embed, ephemeral=True)
 
 
-    @app_commands.command(name = "yumeguessnumber", description = "Guess the number!")
+    @app_commands.command(name="yumeguessnumber", description="Guess the number!")
     async def guess_the_number(self, interaction: discord.Interaction, from_number: int = 0, to_number: int = 100, attempts: int = 10):
         if from_number >= to_number:
             return await interaction.response.send_message("`from_number` must be less than `to_number`.", ephemeral = True)
@@ -192,15 +192,15 @@ class Minigames(commands.Cog):
         self.active_games["guess"][user_id] = game
 
         initial_embed = helpers.embed_generator(
-            title = "Guess The Number",
-            description = f"Guess a number between **{from_number}** and **{to_number}**.\nAttempts: **{attempts}**\n\nClick **Guess** to open the input modal.",
-            color = (0, 191, 255)
+            title="Guess The Number",
+            description=f"Guess a number between **{from_number}** and **{to_number}**.\nAttempts: **{attempts}**\n\nClick **Guess** to open the input modal.",
+            
         )
 
         modal = Minigames.GuessModal(game, view)
         await interaction.response.send_modal(modal)
 
-        sent = await interaction.followup.send(embed = initial_embed, view = view, ephemeral = False)
+        sent = await interaction.followup.send(embed=initial_embed, view=view, ephemeral=False)
         view.message = sent
 
 
@@ -223,7 +223,7 @@ class Minigames(commands.Cog):
         pass
 
 async def setup():
-    await shared.SHIRAYUME.add_cog(Minigames())
+    await shared.SHIRAYUME.add_cog(Minigames(), override=True)
     helpers.custom_print(
         level=shared.LogLevel.DEBUG,
         function_name="cogs.minigames.basic.setup",
