@@ -4,115 +4,20 @@ from discord.ext import commands
 from discord.ui import View, button
 from utils import shared, helpers
 from services.local_economy import EconomyService
+from cogs.economy import ECONOMY_GROUP, ECONOMY_ADMIN_GROUP
+from cogs.economy.paginator import ShopPaginator
 
-class ShopPaginator(View):
-    """
-    A pagination view for navigating the Guild Shop.
-    """
-
-    def __init__(self, shop_items: list[dict], guild_name: str, currency: str, user_id: int) -> None:
-        """
-        Initializes the ShopPaginator view.
-
-        Args:
-            shop_items (list[dict]): A list of dictionaries containing shop item data.
-            guild_name (str): The name of the guild where the shop is located.
-            currency (str): The name of the guild's local currency.
-            user_id (int): The ID of the user browsing the shop.
-        """
-        super().__init__(timeout=180)
-        self.shop_items = shop_items
-        self.guild_name = guild_name
-        self.currency = currency
-        self.user_id = user_id
-        self.current_page = 0
-        self.items_per_page = 5
-        self.max_pages = max(1, (len(self.shop_items) + self.items_per_page - 1) // self.items_per_page)
-        self.update_buttons()
-
-    def generate_embed(self) -> discord.Embed:
-        """
-        Generates the embed for the current page of the shop.
-
-        Returns:
-            discord.Embed: The formatted embed displaying up to 5 shop items.
-        """
-        start = self.current_page * self.items_per_page
-        end = min(start + self.items_per_page, len(self.shop_items))
-        page_items = self.shop_items[start:end]
-
-        embed = helpers.embed_generator(
-            title=f"{self.guild_name} Shop (Page {self.current_page + 1}/{self.max_pages})",
-            description="Use `/buy <item_name>` to purchase an item."
-        )
-
-        for item in page_items:
-            embed.add_field(
-                name=f"{item.get('name')} — {item.get('price')} {self.currency}",
-                value=item.get('description', 'No description provided.'),
-                inline=False
-            )
-        return embed
-
-    def update_buttons(self) -> None:
-        """
-        Updates the state of the navigation buttons based on the current page.
-        """
-        self.prev_button.disabled = self.current_page == 0
-        self.next_button.disabled = self.current_page == self.max_pages - 1
-
-    @button(label="Previous", style=discord.ButtonStyle.secondary, custom_id="shop_prev")
-    async def prev_button(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
-        """
-        Navigates to the previous page in the shop.
-
-        Args:
-            interaction (discord.Interaction): The interaction object.
-            button (discord.ui.Button): The button that was pressed.
-        """
-        self.current_page -= 1
-        self.update_buttons()
-        await interaction.response.edit_message(embed=self.generate_embed(), view=self)
-
-    @button(label="Next", style=discord.ButtonStyle.secondary, custom_id="shop_next")
-    async def next_button(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
-        """
-        Navigates to the next page in the shop.
-
-        Args:
-            interaction (discord.Interaction): The interaction object.
-            button (discord.ui.Button): The button that was pressed.
-        """
-        self.current_page += 1
-        self.update_buttons()
-        await interaction.response.edit_message(embed=self.generate_embed(), view=self)
-
-    @button(label="Close", style=discord.ButtonStyle.danger, custom_id="shop_close")
-    async def close_button(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
-        """
-        Closes the shop view and removes the buttons.
-
-        Args:
-            interaction (discord.Interaction): The interaction object.
-            button (discord.ui.Button): The button that was pressed.
-        """
-        self.stop()
-        embed = helpers.embed_generator(
-            title=f"{self.guild_name} Shop",
-            description="Closed the shop as requested."
-        )
-        await interaction.response.edit_message(embed=embed, view=None)
-
-
-class LocalEconomy(commands.Cog):
+class LocalEconomy(shared.GroupedCog):
     """
     Handles Discord UI and events for the local server economy.
     """
+    group = app_commands.Group(name="local", description="Server economy commands", parent=ECONOMY_GROUP)
 
     def __init__(self) -> None:
         """
         Initializes the LocalEconomy Cog.
         """
+        super().__init__()
         self.service = EconomyService()
     
     @commands.guild_only()
@@ -129,7 +34,7 @@ class LocalEconomy(commands.Cog):
         
         amount_rewarded: int = self.service.process_message_reward(message.guild.id, message.author.id)
 
-    @app_commands.command(name="balances", description="Displays your wallet balance for each mutual server.")
+    @app_commands.command(name="wallets", description="View your wallet balances across all mutual servers.")
     async def check_all_balances(self, interaction: discord.Interaction, private: bool = True) -> None:
         """
         Displays the user's wallet balance across all mutual guilds.
@@ -147,21 +52,21 @@ class LocalEconomy(commands.Cog):
 
         embed = helpers.embed_generator(
             title="Balance per Server",
-            description="Here are your current funds across mutual servers:"
+            description="Here are your current funds across mutual servers."
         )
         for guild in guilds:
             currency: str = self.service.get_guild_currency(guild.id)
             balance: int = self.service.get_balance(guild.id, user.id)
             embed.add_field(
-                name=f"**Server:** {guild.name}",
-                value=f"**> Balance:** {balance} {currency}",
+                name=f"**{guild.name}**",
+                value=f"> {balance} {currency}",
                 inline=False
             )
         
         await interaction.response.send_message(embed=embed, ephemeral=private)
 
     @commands.guild_only()
-    @app_commands.command(name="balance", description="Check your local server balance")
+    @app_commands.command(name="wallet", description="View your wallet balance in this server.")
     async def check_balance(self, interaction: discord.Interaction, member: discord.Member = None, private: bool = True) -> None:
         """
         Displays a user's wallet balance in the current guild.
@@ -185,7 +90,7 @@ class LocalEconomy(commands.Cog):
         await interaction.response.send_message(embed=embed, ephemeral=private)
 
     @commands.guild_only()
-    @app_commands.command(name="transfer", description="Send money to another member")
+    @app_commands.command(name="transfer", description="Send money to another member in this server.")
     async def pay_member(self, interaction: discord.Interaction, member: discord.Member, amount: int) -> None:
         """
         Transfers funds between users within the same guild.
@@ -248,7 +153,7 @@ class LocalEconomy(commands.Cog):
         await interaction.followup.send(embed=embed, ephemeral=True)
 
     @commands.guild_only()
-    @app_commands.command(name="shop_local", description="View the local server shop")
+    @app_commands.command(name="shop", description="Browse items available in this server's shop.")
     async def view_shop(self, interaction: discord.Interaction) -> None:
         """
         Displays available items for purchase using a paginated view.
@@ -256,42 +161,63 @@ class LocalEconomy(commands.Cog):
         Args:
             interaction (discord.Interaction): The interaction object.
         """
+        await interaction.response.defer(thinking=True)
+
         user: discord.Member = interaction.user
         guild: discord.Guild = interaction.guild
-        
-        shop_items: list = self.service.get_shop_items(guild.id)
-        if not shop_items:
-            embed = helpers.embed_generator(
-                title="Empty Shop",
-                description=f"No items found in the {guild.name} shop."
-            )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
-            return
 
-        currency: str = self.service.get_guild_currency(guild.id)
-        
-        view = ShopPaginator(shop_items=shop_items, guild_name=guild.name, currency=currency, user_id=user.id)
-        embed = view.generate_embed()
-        
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+        try:
+            shop_items: list = self.service.get_shop_items(guild.id)
+            if not shop_items:
+                embed = helpers.embed_generator(
+                    title="Empty Shop",
+                    description=f"No items found in the {guild.name} shop."
+                )
+                await interaction.followup.send(embed=embed)
+                return
+
+            currency: str = self.service.get_guild_currency(guild.id)
+            
+            view = ShopPaginator(
+                shop_items=shop_items,
+                user_id=user.id,
+                buy_command=f"/economy local buy",
+                shop_name=guild.name,
+                currency=currency
+            )
+            await interaction.followup.send(embed=view.generate_embed(), view=view)
+            view.original_message = await interaction.original_response()
+            
+        except Exception as e:
+            helpers.custom_print(
+                level=shared.LogLevel.ERROR,
+                function_name="cogs.economy.local.LocalEconomy.view_shop",
+                description=f"Failed to open server's shop with exception: {e}"
+            )
+            embed = helpers.embed_generator(
+                title="Shop Error",
+                description="Failed to open server's shop.",
+                color=discord.Color.red()
+            )
+            await interaction.followup.send(embed=embed)
 
     @commands.guild_only()
-    @app_commands.command(name="buy_local", description="Purchase an item from the local shop")
-    async def buy_item(self, interaction: discord.Interaction, item_name: str) -> None:
+    @app_commands.command(name="buy", description="Purchase an item from this server's shop.")
+    async def buy_item(self, interaction: discord.Interaction, item_id: int) -> None:
         """
         Initiates a purchase. Atomically checks balance, deducts funds, 
         and assigns roles if applicable.
         
         Args:
             interaction (discord.Interaction): The interaction object.
-            item_name (str): The exact name of the item to purchase.
+            item_id (str): The exact ID of the item to purchase.
         """
         await interaction.response.defer(ephemeral=True, thinking=True)
         
         guild: discord.Guild = interaction.guild
         user: discord.Member = interaction.user
         
-        result: dict = self.service.purchase_item(guild.id, user.id, item_name)
+        result: dict = self.service.purchase_item(guild.id, user.id, item_id)
         
         if not result.get("success"):
             embed = helpers.embed_generator(
@@ -339,8 +265,21 @@ class LocalEconomy(commands.Cog):
 
         await interaction.followup.send(embed=embed, ephemeral=True)
 
-    @app_commands.command(name="add_money", description="[Admin] Add money to a user's balance")
+class LocalEconomyAdmin(shared.GroupedCog):
+    """
+    _summary_
+    """
+    group = ECONOMY_ADMIN_GROUP
+
+    def __init__(self) -> None:
+        """
+        Initializes the LocalEconomyAdmin Cog.
+        """
+        super().__init__()
+        self.service = EconomyService()
+
     @app_commands.checks.has_permissions(administrator=True)
+    @app_commands.command(name="mint", description="Give local currency to a member. (Admin)")
     async def admin_add_money(self, interaction: discord.Interaction, member: discord.Member, amount: int) -> None:
         """
         Allows admins to mint new currency and give it to a specific user.
@@ -384,9 +323,93 @@ class LocalEconomy(commands.Cog):
             
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
+    @app_commands.checks.has_permissions(administrator=True)
+    @app_commands.command(name="additem", description="Add a new item to this server's shop. (Admin)")
+    async def admin_add_item(self, interaction: discord.Interaction, name: str, price: int, description: str, role: discord.Role = None) -> None:
+        """
+        Adds a new item to the local server shop.
+
+        Args:
+            interaction (discord.Interaction): The interaction object.
+            name (str): The name of the item.
+            price (int): The cost of the item.
+            description (str): A brief description of the item.
+            role (discord.Role, optional): The role to assign upon purchase.
+        """
+        if price <= 0:
+            await interaction.response.send_message("Operation failed: Price must be greater than 0.", ephemeral=True)
+            return
+
+        role_id = role.id if role else None
+
+        try:
+            success = self.service.add_shop_item(
+                guild_id=interaction.guild.id,
+                name=name,
+                price=price,
+                description=description,
+                role_id=role_id
+            )
+            if success:
+                currency = self.service.get_guild_currency(interaction.guild.id)
+                embed = helpers.embed_generator(
+                    title="Shop Updated",
+                    description=f"Successfully added **{name}** to the shop for `{price} {currency}`.",
+                    color=discord.Color.green()
+                )
+                if role:
+                    embed.add_field(name="Attached Role", value=role.mention, inline=False)
+            else:
+                raise Exception("`add_shop_item` failed")
+            
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+        except Exception as e:
+            embed = helpers.embed_generator(
+                title="Shop Error",
+                description="Failed to add the item to the server's shop.",
+                color=discord.Color.red()
+            )
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            helpers.custom_print(
+                level=shared.LogLevel.ERROR,
+                function_name="cogs.economy.local.LocalEconomyAdmin.admin_add_item",
+                description=f"Failed to add a local item with exception: {e}"
+            )
+
+    @app_commands.checks.has_permissions(administrator=True)
+    @app_commands.command(name="delitem", description="Remove an existing item from this server's shop. (Admin)")
+    async def admin_remove_item(self, interaction: discord.Interaction, item_id: int) -> None:
+        """
+        Removes an item from the local server shop by its ID.
+
+        Args:
+            interaction (discord.Interaction): The interaction object.
+            item_id (int): The unique ID of the item to delete.
+        """
+        success = self.service.remove_shop_item(
+            guild_id=interaction.guild.id, 
+            item_id=item_id
+        )
+
+        if success:
+            embed = helpers.embed_generator(
+                title="Shop Updated",
+                description=f"Successfully removed item ID `{item_id}` from the shop.",
+                color=discord.Color.green()
+            )
+        else:
+            embed = helpers.embed_generator(
+                title="Shop Error",
+                description=f"Operation failed: Item ID `{item_id}` not found or already removed.",
+                color=discord.Color.red()
+            )
+
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
 async def setup() -> None:
     if shared.GLOBAL_CONFIG["features"]["economy"]["local"]["is_enabled"]:
         await shared.SHIRAYUME.add_cog(LocalEconomy(), override=True)
+        await shared.SHIRAYUME.add_cog(LocalEconomyAdmin(), override=True)
         helpers.custom_print(
             level=shared.LogLevel.DEBUG,
             function_name="cogs.local_economy.setup",

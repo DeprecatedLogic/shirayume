@@ -17,6 +17,7 @@ CREATE TABLE users (
     avatar_url VARCHAR(2048) NULL,
     is_bot BOOLEAN DEFAULT FALSE NOT NULL,
     balance BIGINT DEFAULT 0 NOT NULL,
+    active_items JSON NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP() NOT NULL,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP()
         ON UPDATE CURRENT_TIMESTAMP()
@@ -37,6 +38,8 @@ CREATE TABLE guilds (
     stats_channel_ids JSON NULL,
     base_message_reward INT DEFAULT 0 NOT NULL,
     currency VARCHAR(255) DEFAULT "Credits" NOT NULL,
+    yume_points BIGINT DEFAULT 0 NOT NULL,
+    tax_rate FLOAT DEFAULT 0.05 NOT NULL,
     welcome_channel BIGINT NULL,
     leave_channel BIGINT NULL,
     joined_at DATETIME DEFAULT CURRENT_TIMESTAMP() NOT NULL,

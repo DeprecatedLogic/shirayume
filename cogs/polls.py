@@ -65,24 +65,23 @@ class PollCreationView(View):
             await interaction.response.send_message(content = "Please set a duration for the poll.", ephemeral = True)
             return None
         
-        poll = {
-            "poll_id": -1,
-            "guild_id": interaction.guild_id,
-            "creator_id": interaction.user.id,
-            "question": self.question,
-            "votes": {str(option): [] for option in self.options},
-            "is_active": True,
-            "created_at": datetime.now(),
-            "updated_at": datetime.now(),
-            "ends_at": datetime.now() + dt.timedelta(
+        datetime_now = datetime.now()
+        self.poll_model = await polls_service.create_poll(
+            guild_id=interaction.guild_id,
+            creator_id=interaction.user.id,
+            question=self.question,
+            votes={str(option): [] for option in self.options},
+            is_active=True,
+            created_at=datetime_now,
+            updated_at=datetime_now,
+            ends_at=datetime_now + dt.timedelta(
                 days = self.duration_days,
                 hours = self.duration_hours,
                 minutes = self.duration_minutes,
                 seconds = self.duration_seconds
             ),
-            "is_dirty": True
-        }
-        self.poll_model = await polls_service.create_poll(**poll)
+            is_dirty=True
+        )
         poll_model = self.poll_model
 
         if poll_model:
@@ -93,7 +92,7 @@ class PollCreationView(View):
                 description = "",
                 color = (128, 0, 128)
             )
-            status = f"Closes at {poll_model.ends_at.strftime('%Y-%m-%d %H:%M:%S')} (in {str(poll_model.ends_at - datetime.now()).split('.')[0]})"
+            status = f"Closes at {poll_model.ends_at.strftime('%Y-%m-%d %H:%M:%S')} (in {str(poll_model.ends_at - datetime_now).split('.')[0]})"
             new_embed.add_field(name = "Status", value = status, inline = False)
 
             options_text = "\n".join(f"`{opt}` (votes: 0)" for opt in self.options)
@@ -138,7 +137,7 @@ class PollCreationView(View):
 
             # Schedule auto-end task
             task = asyncio.create_task(
-                polls_service._sleep_and_finish_poll(
+                polls_service._sleep_and_close_poll(
                     poll_id = poll_model.poll_id,
                     guild_id = poll_model.guild_id,
                     ends_at = poll_model.ends_at
@@ -457,7 +456,7 @@ class PollVoteView(discord.ui.View):
 class Poll(commands.Cog):
     poll_views: dict[int, PollCreationView] = {}
     
-    @app_commands.command(name = "yumepoll", description = "Create a new poll")
+    @app_commands.command(name = "poll", description = "Create a new poll")
     async def create_poll(self, interaction: discord.Interaction, question: str) -> None:
         if len(question) > 255:
             await interaction.response.send_message(
@@ -474,7 +473,7 @@ class Poll(commands.Cog):
         view.setup_interaction = interaction
         await interaction.response.send_message(embed = embed, view = view, ephemeral = True)
 
-    @app_commands.command(name = "yumepollend", description = "End an existing poll")
+    @app_commands.command(name = "pollend", description = "End an existing poll")
     async def end_poll(self, interaction: discord.Interaction, poll_id: int) -> None:
         if await polls_service.end_poll(poll_id, interaction.user.id, interaction.guild_id):
             if Poll.poll_views.get(poll_id) is None:
@@ -528,7 +527,7 @@ class Poll(commands.Cog):
                 delete_after = 3
             )
 
-    @app_commands.command(name = "yumepolls", description = "See all your active polls")
+    @app_commands.command(name = "activepolls", description = "See all your active polls")
     async def show_active_polls(self, interaction: discord.Interaction, user: discord.User = None) -> None:        
         user_id = interaction.user.id if not user else user.id
 
@@ -592,7 +591,7 @@ class Poll(commands.Cog):
                 #delete_after = 3
             )
     
-    @app_commands.command(name = "yumepollvote", description = "Vote for a poll")
+    @app_commands.command(name = "pollvote", description = "Vote for a poll")
     async def vote_poll(self, interaction: discord.Interaction, poll_id: int, option: str) -> None:
         if await polls_service.vote_poll(poll_id, interaction.guild_id, interaction.user.id, option):
             if Poll.poll_views.get(poll_id) is None:
@@ -651,7 +650,7 @@ class Poll(commands.Cog):
                 delete_after = 3
             )
 
-    @app_commands.command(name = "yumecancelvote", description = "Cancel your vote from a poll")
+    @app_commands.command(name = "cancelvote", description = "Cancel your vote from a poll")
     async def cancel_vote(self, interaction: discord.Interaction, poll_id: int) -> None:
         if await polls_service.cancel_vote_poll(poll_id, interaction.guild_id, interaction.user.id):
             await interaction.response.send_message(

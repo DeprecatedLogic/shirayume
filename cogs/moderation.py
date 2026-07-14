@@ -21,16 +21,15 @@ class Moderation(commands.Cog):
             await interaction.response.send_message(embed=embed)
 
             moderation.add_moderation_logs(
-            mlog_id=-1,
-            guild_id=interaction.guild.id,
-            user_id=member.id,
-            moderator_id=interaction.user.id,
-            action_type=shared.Action.kick,
-            reason=reason,
-            action_timestamp=datetime.now(timezone.utc),
-            duration_minutes=0,
-            is_active=True,
-            pardoned=False
+                guild_id=interaction.guild.id,
+                user_id=member.id,
+                moderator_id=interaction.user.id,
+                action_type=shared.Action.kick,
+                reason=reason,
+                action_timestamp=datetime.now(timezone.utc),
+                duration_minutes=0,
+                is_active=True,
+                pardoned=False
             )
 
         except discord.Forbidden:
@@ -61,16 +60,15 @@ class Moderation(commands.Cog):
             await interaction.response.send_message(embed=embed)
 
             moderation.add_moderation_logs(
-            mlog_id=-1,
-            guild_id=interaction.guild.id,
-            user_id=member.id,
-            moderator_id=interaction.user.id,
-            action_type=shared.Action.ban,
-            reason=reason,
-            action_timestamp=datetime.now(timezone.utc),
-            duration_minutes=0,
-            is_active=True,
-            pardoned=False
+                guild_id=interaction.guild.id,
+                user_id=member.id,
+                moderator_id=interaction.user.id,
+                action_type=shared.Action.ban,
+                reason=reason,
+                action_timestamp=datetime.now(timezone.utc),
+                duration_minutes=0,
+                is_active=True,
+                pardoned=False
             )
 
         except discord.Forbidden:
@@ -101,16 +99,15 @@ class Moderation(commands.Cog):
             await interaction.response.send_message(embed=embed)
 
             moderation.add_moderation_logs(
-            mlog_id=-1,
-            guild_id=interaction.guild.id,
-            user_id=user.id,
-            moderator_id=interaction.user.id,
-            action_type=shared.Action.unban,
-            reason=None,
-            action_timestamp=datetime.now(timezone.utc),
-            duration_minutes=0,
-            is_active=True,
-            pardoned=False
+                guild_id=interaction.guild.id,
+                user_id=user.id,
+                moderator_id=interaction.user.id,
+                action_type=shared.Action.unban,
+                reason=None,
+                action_timestamp=datetime.now(timezone.utc),
+                duration_minutes=0,
+                is_active=True,
+                pardoned=False
             )
 
         except discord.Forbidden:
@@ -153,16 +150,15 @@ class Moderation(commands.Cog):
             await interaction.response.send_message(embed=embed)
 
             moderation.add_moderation_logs(
-            mlog_id=-1,
-            guild_id=interaction.guild.id,
-            user_id=member.id,
-            moderator_id=interaction.user.id,
-            action_type=shared.Action.mute,
-            reason=reason,
-            action_timestamp=datetime.now(timezone.utc),
-            duration_minutes=duration.total_seconds() // 60,
-            is_active=True,
-            pardoned=False
+                guild_id=interaction.guild.id,
+                user_id=member.id,
+                moderator_id=interaction.user.id,
+                action_type=shared.Action.mute,
+                reason=reason,
+                action_timestamp=datetime.now(timezone.utc),
+                duration_minutes=duration.total_seconds() // 60,
+                is_active=True,
+                pardoned=False
             )   
             
         except discord.Forbidden:
@@ -200,16 +196,15 @@ class Moderation(commands.Cog):
             await interaction.response.send_message(embed=embed)
 
             moderation.add_moderation_logs(
-            mlog_id=-1,
-            guild_id=interaction.guild.id,
-            user_id=member.id,
-            moderator_id=interaction.user.id,
-            action_type=shared.Action.unmute,
-            reason=reason,
-            action_timestamp=datetime.now(timezone.utc),
-            duration_minutes=0,
-            is_active=True,
-            pardoned=False
+                guild_id=interaction.guild.id,
+                user_id=member.id,
+                moderator_id=interaction.user.id,
+                action_type=shared.Action.unmute,
+                reason=reason,
+                action_timestamp=datetime.now(timezone.utc),
+                duration_minutes=0,
+                is_active=True,
+                pardoned=False
             )
 
         except discord.Forbidden:
@@ -239,16 +234,15 @@ class Moderation(commands.Cog):
             await interaction.response.send_message(embed = embed)
 
             moderation.add_moderation_logs(
-            mlog_id=-1,
-            guild_id=interaction.guild.id,
-            user_id=member.id,
-            moderator_id=interaction.user.id,
-            action_type=shared.Action.warn,
-            reason=reason,
-            action_timestamp=datetime.now(timezone.utc),
-            duration_minutes=0,
-            is_active=True,
-            pardoned=False
+                guild_id=interaction.guild.id,
+                user_id=member.id,
+                moderator_id=interaction.user.id,
+                action_type=shared.Action.warn,
+                reason=reason,
+                action_timestamp=datetime.now(timezone.utc),
+                duration_minutes=0,
+                is_active=True,
+                pardoned=False
             )
             
         except discord.Forbidden:
@@ -266,7 +260,7 @@ class Moderation(commands.Cog):
             await interaction.response.send_message(embed = embed, ephemeral=True)
 
 
-    @app_commands.command(name="yumepurge", description="Purge messages from a member in the current channel")
+    @app_commands.command(name="purge", description="Purge messages from a member in the current channel")
     @app_commands.checks.has_permissions(manage_messages=True, read_message_history=True)
     async def purge_messages_from_member(self, interaction: discord.Interaction, member: discord.Member, amount: int):
         if amount < 1 or amount > 100:
@@ -337,7 +331,6 @@ class Moderation(commands.Cog):
             await message_followup.edit(embed=embed)
 
             moderation.add_moderation_logs(
-                mlog_id=-1,
                 guild_id=interaction.guild.id,
                 user_id=member.id,
                 moderator_id=interaction.user.id,

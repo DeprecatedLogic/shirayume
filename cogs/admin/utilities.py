@@ -1,13 +1,13 @@
 import discord
-from discord import app_commands
 from discord.ext import commands
 from utils import shared, helpers
 from typing import Literal, Optional
 from pathlib import Path
-from database.database_manager import DB_MANAGER
+import base64
+import requests
 import asyncio
 
-class Admin(commands.Cog):
+class AdminUtils(commands.Cog):
 
     @commands.is_owner()
     @commands.command(name="shutdown")
@@ -15,11 +15,14 @@ class Admin(commands.Cog):
         """ Disconnects bot by closing the client."""
 
         embed = helpers.embed_generator(
-                title = "Shutting Down",
-                description = "Vanishing into the void... Please, delete my browser history. :saluting_face:",
-                color = (205, 85, 0)
-            )
+            title="Shutting Down",
+            description="Vanishing into the void... Please, delete my browser history :saluting_face:",
+            color=(205, 85, 0)
+        )
         await ctx.send(embed=embed)
+        
+        if delay > 0:
+            await asyncio.sleep(float(delay))
         await shared.SHIRAYUME.close()
 
     @commands.guild_only()
@@ -27,7 +30,8 @@ class Admin(commands.Cog):
     @commands.command(name="sync")
     async def sync(self, ctx: commands.Context, guilds: commands.Greedy[discord.Object],
                 spec: Optional[Literal["~", "*", "^"]] = None) -> None:
-        """ Syncs commands based on spec.
+        """
+        Syncs commands based on spec.
         
         ~: sync
         *: copy global & sync
@@ -42,15 +46,19 @@ class Admin(commands.Cog):
         temp_msg = await ctx.send(embed=embed)
 
         if not guilds:
+
             if spec == "~":
-                synced = await ctx.bot.tree.sync(guild = ctx.guild)
+                synced = await ctx.bot.tree.sync(guild=ctx.guild)
+
             elif spec == "*":
-                ctx.bot.tree.copy_global_to(guild = ctx.guild)
-                synced = await ctx.bot.tree.sync(guild = ctx.guild)
+                ctx.bot.tree.copy_global_to(guild=ctx.guild)
+                synced = await ctx.bot.tree.sync(guild=ctx.guild)
+
             elif spec == "^":
-                ctx.bot.tree.clear_commands(guild = ctx.guild)
-                await ctx.bot.tree.sync(guild = ctx.guild)
+                ctx.bot.tree.clear_commands(guild=ctx.guild)
+                await ctx.bot.tree.sync(guild=ctx.guild)
                 synced = []
+
             else:
                 synced = await ctx.bot.tree.sync()
 
@@ -68,9 +76,9 @@ class Admin(commands.Cog):
                 await ctx.bot.tree.sync(guild = guild)
             except discord.HTTPException as e:
                 helpers.custom_print(
-                    level = shared.LogLevel.INFO,
-                    function_name = "sync",
-                    description = f"An HTTP exception has occured: {e}"
+                    level=shared.LogLevel.INFO,
+                    function_name="sync",
+                    description=f"An HTTP exception has occured: {e}"
                 )
             else:
                 ret += 1
@@ -78,7 +86,7 @@ class Admin(commands.Cog):
         try:
             await temp_msg.message.delete()
             await temp_msg.delete()
-        except:
+        except Exception as e:
             pass
 
         embed = helpers.embed_generator(
@@ -112,43 +120,43 @@ class Admin(commands.Cog):
         # No arguments?
         if not args:
 
-            prefix_commands = [str(i + 1) + ". " + x for i, x in enumerate(prefix_comm_names, start = 0)]
-            slash_commands = [str(i + 1) + ". " + x for i, x in enumerate(slash_comm_names, start = 0)]
+            prefix_commands = [str(i + 1) + ". " + comm_name for i, comm_name in enumerate(prefix_comm_names, start = 0)]
+            slash_commands = [str(i + 1) + ". " + comm_name for i, comm_name in enumerate(slash_comm_names, start = 0)]
 
             name = "Prefix Commands"
             embed.add_field(
-                name = name,
-                value = '-' * len(name) + '\n' + "\n".join(prefix_commands),
-                inline = False
+                name=name,
+                value='-' * len(name) + '\n' + "\n".join(prefix_commands),
+                inline=False
             )
 
             name = "Slash Commands"
             embed.add_field(
-                name = name,
-                value = '-' * len(name) + '\n' + "\n".join(slash_commands),
-                inline = False
+                name=name,
+                value='-' * len(name) + '\n' + "\n".join(slash_commands),
+                inline=False
             )
 
             name = "Details"
             embed.add_field(
-                name = name,
-                value = '-' * len(
-                    name) + '\n' + f"Type `{shared.SHIRAYUME.command_prefix}help <command_name>` for more details about a command.",
-                inline = False
+                name=name,
+                value='-' * len(name) + '\n' +
+                f"Type `{shared.SHIRAYUME.command_prefix}help <command_name>` for more details about a command.",
+                inline=False
             )
 
         elif args in slash_comm_names:
             embed.add_field(
-                name = args,
-                value = shared.SHIRAYUME.get_command(args).help
+                name=args,
+                value=shared.SHIRAYUME.get_command(args).help
             )
         else:
             embed.add_field(
-                name = "Couldn't find that command!",
-                value = "Do you think I'm wikipedia or what...?"
+                name="Couldn't find that command!",
+                value="Do you think I'm wikipedia or what...?"
             )
         
-        await ctx.send(embed = embed)
+        await ctx.send(embed=embed)
 
     @commands.is_owner()
     @commands.command(name="upload_pfp")
@@ -165,46 +173,52 @@ class Admin(commands.Cog):
 
         if not image_path:
             helpers.custom_print(
-                level = shared.LogLevel.INFO,
-                function_name = "upload_pfp",
-                description = "Image path is empty."
+                level=shared.LogLevel.INFO,
+                function_name="cogs.Admin.upload_pfp",
+                description="Image path is empty."
             )
             embed = helpers.embed_generator(
                 title="Empty image path",
                 description=f"You forgot the image path, {user}. Focus pocus please! >w<",
-                color = (204, 166, 0)
+                color=discord.Color.orange
             )
             return
 
-
-        msg = await util.send_text(
-            channel = ctx.channel,
-            title = 'Uploading profile picture...',
-            description = f'This may take a while, {user}. Please be patient... :sweat_smile:',
-            color = (53, 68, 84)
+        embed = helpers.embed_generator(
+            title="Uploading profile picture...",
+            description=f"This may take a while, {user}. Please be patient... :sweat_smile:"
         )
+        msg = await ctx.send(embed=embed)
 
         try:
             # Remove quotes and leading/trailing whitespaces from the image path
-            image_path = image_path.replace('"', "").replace("'", "").strip()
+            image_path = helpers.remove_characters(image_path,"\"'").strip()
             image_path = Path(image_path)
-            
+            suffix = image_path.suffix[1:]
+            if suffix == "jpg":
+                suffix = "jpeg"
+
             if not image_path.is_file():
                 raise Exception("Path provided is not a file")
-            elif image_path.suffix not in ("jpeg", "jpg", "png", "gif"):
+            elif suffix not in ("jpeg", "png", "gif"):
+                helpers.custom_print(
+                    level=shared.LogLevel.DEBUG,
+                    function_name="cogs.Admin.upload_pfp",
+                    description=f"File suffix is {suffix}"
+                )
                 raise Exception("File suffix is invalid")
 
             with image_path.open("rb") as image_file:
                 encoded_image = base64.b64encode(image_file.read()).decode('utf-8')
 
             headers = {
-                "Authorization": f"Bot {os.getenv('TOKEN')}",
+                "Authorization": f"Bot {shared.SHIRAYUME.token}",
                 "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:152.0) Gecko/20100101 Firefox/152.0",
                 "Content-Type": "application/json"
             }
 
             data = {
-                "avatar": f"data:image/png;base64,{encoded_image}"
+                "avatar": f"data:image/{suffix};base64,{encoded_image}"
             }
 
             url = "https://discord.com/api/v9/users/@me"
@@ -213,47 +227,49 @@ class Admin(commands.Cog):
 
             if response.status_code != 200:
                 embed = helpers.embed_generator(
-                    title = "Failed to upload the profile picture.",
-                    description = f"It seems like an error has occured! Please try again later... :disappointed:",
-                    color = discord.Color.from_rgb(204, 166, 0)
+                    title="Failed to upload the profile picture",
+                    description=f"It seems like an error has occured! Please try again later... :disappointed:",
+                    color=discord.Color.red
                 )
-                await msg.edit(embed = embed)
+                await msg.edit(embed=embed)
 
                 helpers.custom_print(
-                    level = shared.LogLevel.INFO,
-                    function_name = "upload_pfp",
-                    description = f"HTML Request Error: Response status code is {response.status_code} instead of 200"
+                    level=shared.LogLevel.INFO,
+                    function_name="cogs.Admin.upload_pfp",
+                    description=f"HTML Request Error: Response status code is {response.status_code} instead of 200"
                 )
                 helpers.custom_print(
-                    level = shared.LogLevel.INFO,
-                    function_name = "upload_pfp",
-                    description = f"Response json: {response.json()}"
+                    level=shared.LogLevel.INFO,
+                    function_name="cogs.Admin.upload_pfp",
+                    description=f"Response json: {response.json()}"
                 )
                 return
 
-            await msg.edit(embed = discord.Embed(
-                title = 'Profile picture uploaded succesfully.',
-                description = f'Thank you {user} for keeping my profile picture up to date! :smiling_face:',
-                color = discord.Color.from_rgb(79, 213, 128)
+            embed = discord.Embed(
+                title="Profile picture uploaded succesfully",
+                description=f"Thank you {user} for keeping my profile picture up to date! :smiling_face:",
+                color=discord.Color.green
             )
-            )
+            await msg.edit(embed=embed)
+            await helpers.update_default_color()
+            
             helpers.custom_print(
-                level = shared.LogLevel.INFO,
-                function_name = "upload_pfp",
-                description = "Profile picture uploaded!"
+                level=shared.LogLevel.INFO,
+                function_name="cogs.Admin.upload_pfp",
+                description="Profile picture uploaded!"
             )
 
         except Exception as e:
             embed = helpers.embed_generator(
-                title = 'Failed to upload the profile picture.',
-                description = f'It seems like an error has occured! Please try again later... :disappointed:',
-                color = discord.Color.from_rgb(204, 166, 0)
+                title="Failed to upload the profile picture",
+                description=f"It seems like an error has occured! Please try again later... :disappointed:",
+                color=discord.Color.red
             )
             await msg.edit(embed=embed)
             helpers.custom_print(
-                level = shared.LogLevel.INFO,
-                function_name = "upload_pfp",
-                description = f"Failed to upload the profile picture, exception: {e}"
+                level=shared.LogLevel.ERROR,
+                function_name="cogs.Admin.upload_pfp",
+                description=f"Failed to upload the profile picture, exception: {e}"
             )
 
     @commands.is_owner()
@@ -273,49 +289,53 @@ class Admin(commands.Cog):
         
         if not image_path:
             helpers.custom_print(
-                function_name = "upload_pfp",
-                level = shared.LogLevel.INFO,
-                description = [
-                    "Image path is empty."
-                ],
-                rgb_values = [
-                    (206, 136, 108)
-                ],
-                add_datetime = True,
-                sep = '',
-                begin = f'{term.color_rgb(255, 30, 30)}FAILED',
-                end = '\n'
+                function_name="cogs.Admin.upload_banner",
+                level=shared.LogLevel.INFO,
+                description="Image path is empty"
             )
             embed = helpers.embed_generator(
                 title="Empty Image Path...",
-                description = f"You forgot the image path {user}. Focus pocus please! >w<",
-                color = (204, 166, 0)
+                description=f"You forgot the image path {user}. Focus pocus please! >w<",
+                color=discord.Color.orange
             )
             ctx.send(embed=embed)
             return
 
         embed = helpers.embed_generator(
-            title = "Uploading banner...",
-            description = f"This may take a while {user}, please be patient... 😅",
-            color = (53, 68, 84)
+            title="Uploading banner...",
+            description=f"This may take a while {user}, please be patient... 😅",
         )
         msg = ctx.send(embed=embed)
 
         try:
             # Remove quotes and leading/trailing whitespaces from the image path
-            image_path = image_path.replace('"', "").replace("'", "").strip()
+            image_path = helpers.remove_characters(image_path,"\"'").strip()
+            image_path = Path(image_path)
+            suffix = image_path.suffix[1:]
+            if suffix == "jpg":
+                suffix = "jpeg"
 
-            with open(image_path, "rb") as image_file:
+            if not image_path.is_file():
+                raise Exception("Path provided is not a file")
+            elif suffix not in ("jpeg", "png", "gif"):
+                helpers.custom_print(
+                    level=shared.LogLevel.DEBUG,
+                    function_name="cogs.Admin.upload_pfp",
+                    description=f"File suffix is {suffix}"
+                )
+                raise Exception("File suffix is invalid")
+
+            with image_path.open("rb") as image_file:
                 encoded_image = base64.b64encode(image_file.read()).decode('utf-8')
 
             headers = {
-                "Authorization": f"Bot {os.getenv('TOKEN')}",
+                "Authorization": f"Bot {shared.SHIRAYUME.token}",
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:102.0) Gecko/20100101 Firefox/102.0",
                 "Content-Type": "application/json"
             }
 
             data = {
-                "banner": f"data:image/png;base64,{encoded_image}"
+                "banner": f"data:image/{suffix};base64,{encoded_image}"
             }
 
             url = "https://discord.com/api/v9/users/@me"
@@ -323,95 +343,56 @@ class Admin(commands.Cog):
             response = requests.patch(url, headers = headers, json = data)
 
             if response.status_code != 200:
-                await msg.edit(embed = discord.Embed(
-                    title = 'Failed to upload the banner.',
-                    description = f'It seems like an error has occured! Please try again later... 😞',
-                    color = discord.Color.from_rgb(204, 166, 0)
+
+                embed = helpers.embed_generator(
+                    title="Failed to upload the banner.",
+                    description=f"It seems like an error has occured! Please try again later... 😞",
+                    color=discord.Color.red
                 )
+                await msg.edit(embed=embed)
+
+                helpers.custom_print(
+                    level=shared.LogLevel.INFO,
+                    function_name="cogs.Admin.upload_banner",
+                    description=f"HTML Request Error: Response status code is {response.status_code} instead of 200",
                 )
                 helpers.custom_print(
-                    function_name = "upload_banner",
-                    level = shared.LogLevel.INFO,
-                    description = [
-                        "HTML Request Error: Response status code is",
-                        f"{response.status_code}",
-                        "instead of 200"
-                    ],
-                    rgb_values = [
-                        (206, 136, 108),
-                        (140, 217, 225),
-                        (206, 136, 108)
-                    ],
-                    add_datetime = True,
-                    sep = ' ',
-                    begin = f'{term.color_rgb(255, 30, 30)}ERROR',
-                    end = '\n'
-                )
-                helpers.custom_print(
-                    function_name = "upload_banner",
-                    level = shared.LogLevel.INFO,
-                    description = [
-                        "Response json:",
-                        f"{response.json()}"
-                    ],
-                    rgb_values = [
-                        (206, 136, 108),
-                        (140, 217, 225)
-                    ],
-                    add_datetime = True,
-                    sep = '\n\n',
-                    begin = f'{term.color_rgb(255, 30, 30)}ERROR',
-                    end = '\n'
+                    level=shared.LogLevel.INFO,
+                    function_name="cogs.Admin.upload_banner",
+                    description=f"Response json: {response.json()}",
                 )
                 return
 
-            await msg.edit(embed = discord.Embed(
-                title = 'Banner uploaded succesfully.',
-                description = f'Thank you {user} for keeping my banner up to date! 😊',
-                color = discord.Color.from_rgb(79, 213, 128)
+            embed = helpers.embed_generator(
+                title="Banner uploaded succesfully",
+                description=f"Thank you {user} for keeping my banner up to date! 😊",
+                color=discord.Color.green
             )
-            )
+            await msg.edit(embed=embed)
+            await helpers.update_default_color()
+
             helpers.custom_print(
-                function_name = "upload_banner",
-                level = shared.LogLevel.INFO,
-                description = [
-                    "Banner uploaded!"
-                ],
-                rgb_values = [
-                    (206, 136, 108)
-                ],
-                add_datetime = True,
-                sep = '',
-                begin = f'{term.color_rgb(30, 255, 30)}SUCCEEDED',
-                end = '\n'
+                level=shared.LogLevel.INFO,
+                function_name="cogs.Admin.upload_banner",
+                description="Banner uploaded",
             )
 
         except Exception as e:
-            await msg.edit(embed = discord.Embed(
-                title = 'Failed to upload the banner.',
-                description = f'It seems like an error has occured! Please try again later... 😞',
-                color = discord.Color.from_rgb(204, 166, 0)
+            embed = helpers.embed_generator(
+                title="Failed to upload the banner",
+                description=f"It seems like an error has occured! Please try again later... 😞",
+                color=discord.Color.red
             )
-            )
+            await msg.edit(embed=embed)
+
             helpers.custom_print(
-                function_name = "upload_banner",
-                level = shared.LogLevel.INFO,
-                description = [
-                    "Failed to upload the banner, exception:",
-                    f"{e}"
-                ],
-                rgb_values = [
-                    (206, 136, 108),
-                    (140, 217, 225)
-                ],
-                add_datetime = True,
-                sep = '\n\n',
-                begin = f'{term.color_rgb(255, 30, 30)}ERROR',
-                end = '\n'
+                level=shared.LogLevel.INFO,
+                function_name="cogs.Admin.upload_banner",
+                description=f"Failed to upload the banner, exception: {e}",
             )
 
 async def setup() -> None:
-    await shared.SHIRAYUME.add_cog(Admin(), override=True)
+    await shared.SHIRAYUME.add_cog(AdminUtils(), override=True)
     helpers.custom_print(
         level=shared.LogLevel.DEBUG,
         function_name="cogs.admin.utilities.setup",

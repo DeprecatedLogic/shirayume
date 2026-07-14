@@ -57,7 +57,7 @@ class User():
                 avatar_url = data.get("avatar_url", ""),
                 is_bot = bool(data["is_bot"]),
                 balance = data.get("balance", 0),
-                active_items = data.get("active_items", {}),
+                active_items = json.loads(data["active_items"]) if isinstance(data.get("active_items"), str) else data.get("active_items", {}),
                 created_at = data["created_at"],
                 updated_at = data.get("updated_at", data["created_at"]),
                 is_dirty = bool(data.get("is_dirty", False)),

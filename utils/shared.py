@@ -1,12 +1,28 @@
 from enum import Enum, auto
 import blessed
 from discord.ext import commands
-from dataclasses import dataclass, field
+from discord import app_commands
 from typing import Any
 
 GLOBAL_CONFIG = {}
 GLOBAL_TERMINAL = blessed.Terminal()
 SHIRAYUME: commands.Bot | None = None
+
+class GroupedCog(commands.Cog):
+    """Base class that automatically adds all app_commands to a group."""
+    group : app_commands.Group = None # override in subclass
+
+    def __init__(self):
+        super().__init__()
+        if self.group:
+            try:
+                for command in self.__cog_app_commands__:
+                    if isinstance(command, app_commands.Command):
+                        self.group.add_command(command)
+            except Exception as e:
+                raise Exception(f"An error occured while adding commands to this group\nException: {e}")
+        else:
+            raise Exception(f"Class {self.__class__} did not override the group attribute")
 
 class LogLevel(Enum):
     """ Defines logging levels with priority. """

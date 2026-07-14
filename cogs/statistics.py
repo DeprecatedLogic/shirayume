@@ -151,7 +151,7 @@ class Statistics(commands.Cog):
                 self._delayed_sync(guild)
             )
 
-    @app_commands.command(name="yumestats", description="Enable or disable server statistics")
+    @app_commands.command(name="stats", description="Enable or disable server statistics")
     @app_commands.checks.has_permissions(administrator=True)
     async def toggle_stats(self, interaction: discord.Interaction, action: Literal["enable", "disable"]):
         await interaction.response.defer(ephemeral=False)
@@ -182,7 +182,6 @@ class Statistics(commands.Cog):
                 embed = helpers.embed_generator(
                     title="Statistics",
                     description="Statistics are already enabled or globally disabled by Shirayume's developers.",
-                    color=discord.Color.orange()
                 )
 
         else: # action == "disable"
@@ -215,7 +214,6 @@ class Statistics(commands.Cog):
                 embed = helpers.embed_generator(
                     title="Statistics",
                     description="Statistics are already disabled.",
-                    color=discord.Color.red()
                 )
 
         await interaction.followup.send(embed=embed)

@@ -1,6 +1,7 @@
 from typing import Dict, List, Any, Optional
 from database import database_manager, models
 from utils import shared, helpers
+import heapq
 
 class GlobalEconomyService:
     """
@@ -11,27 +12,27 @@ class GlobalEconomyService:
         pass
 
     def _get_user(self, user_id: int) -> Optional[models.User]:
-        DB_MANAGER = database_manager.DB_MANAGER
-        if not DB_MANAGER:
+        db_manager = database_manager.DB_MANAGER
+        if not db_manager:
             helpers.custom_print(
                 level = shared.LogLevel.CRITICAL,
                 function_name = "services.GlobalEconomyService._get_user",
-                description = f"DB_MANAGER ({DB_MANAGER}) has not been initialized"
+                description = f"DB_MANAGER ({db_manager}) has not been initialized"
             )
             raise RuntimeError("DB_MANAGER not initialized")
 
-        return next((user for user in DB_MANAGER.users if user.user_id == user_id), None)
+        return next((user for user in db_manager.users if user.user_id == user_id), None)
 
     def _get_guild(self, guild_id: int) -> Any:
-        DB_MANAGER = database_manager.DB_MANAGER
-        if not DB_MANAGER:
+        db_manager = database_manager.DB_MANAGER
+        if not db_manager:
             helpers.custom_print(
                 level = shared.LogLevel.CRITICAL,
                 function_name = "services.GlobalEconomyService._get_guild",
-                description = f"DB_MANAGER ({DB_MANAGER}) has not been initialized"
+                description = f"DB_MANAGER ({db_manager}) has not been initialized"
             )
             raise RuntimeError("DB_MANAGER not initialized")
-        return next((g for g in DB_MANAGER.guilds if g.guild_id == guild_id), None)
+        return next((guild for guild in db_manager.guilds if guild.guild_id == guild_id), None)
 
     def process_game_win(self, user_id: int, guild_id: int, base_reward: int) -> Dict[str, int]:
         """
@@ -85,6 +86,22 @@ class GlobalEconomyService:
             return True
         return False
 
+    def get_guild_tax(self, guild_id: int) -> float:
+        """
+        Gets the guild's tax rate.
+
+        Args:
+            guild_id (int): _description_
+
+        Returns:
+            float: _description_
+        """ 
+        guild = self._get_guild(guild_id)
+        if guild:
+            return guild.tax_rate
+            
+        return -1
+
     def get_global_shop_items(self) -> List[Dict[str, Any]]:
         """
         _summary_
@@ -92,10 +109,10 @@ class GlobalEconomyService:
         Returns:
             List[Dict[str, Any]]: _description_
         """
-        db = database_manager.DB_MANAGER
-        if not db: return []
+        db_manager = database_manager.DB_MANAGER
+        if not db_manager: return []
         
-        items = [item for item in getattr(db, "global_shop_items", []) if not item.is_deleted]
+        items = [item for item in getattr(db_manager, "global_shop_items", []) if not item.is_deleted]
         return [
             {
                 "item_id": i.item_id,
@@ -122,8 +139,8 @@ class GlobalEconomyService:
         user = self._get_user(user_id)
         if not user: return {"success": False, "reason": "User profile not found."}
 
-        db = database_manager.DB_MANAGER
-        item = next((i for i in getattr(db, "global_shop_items", []) if i.item_id == item_id and not i.is_deleted), None)
+        db_manager = database_manager.DB_MANAGER
+        item = next((i for i in getattr(db_manager, "global_shop_items", []) if i.item_id == item_id and not i.is_deleted), None)
 
         if not item:
             return {"success": False, "reason": "Item not found in the global shop."}
@@ -142,3 +159,71 @@ class GlobalEconomyService:
 
         database_manager.DB_MANAGER.mark_dirty(shared.Table.users, user)
         return {"success": True, "item": item}
+
+    def get_top_guilds(self, guild_id: int, number_of_guilds: int) -> list[models.Guild]:
+        """
+        _summary_
+
+        Args:
+            guild_id (int): _description_
+            number_of_guilds (int): _description_
+
+        Returns:
+            list[models.Guild]: _description_
+        """
+        db_manager = database_manager.DB_MANAGER
+        if not db_manager:
+            helpers.custom_print(
+                level = shared.LogLevel.CRITICAL,
+                function_name = "services.GlobalEconomyService.get_top_guilds",
+                description = f"DB_MANAGER ({db_manager}) has not been initialized"
+            )
+            raise RuntimeError("DB_MANAGER not initialized")
+
+        # Keep number_of_guilds inside [1, 100] range
+        if number_of_guilds > 100:
+            number_of_guilds = 100
+        elif number_of_guilds < 1:
+            number_of_guilds = 1
+        
+        return heapq.nlargest(
+            number_of_guilds,
+            db_manager.guilds,
+            key=lambda g: getattr(g, 'yume_points', 0)
+        )
+
+    def add_global_shop_item(self, name: str, price: int, item_type_name: str, metadata: dict, description: str) -> Dict[str, Any]:
+        """
+        Creates a new GlobalShopItem and inserts it into the database memory.
+        """
+        db_manager = database_manager.DB_MANAGER
+        if not db_manager:
+            return {"success": False, "reason": "Database manager not initialized."}
+
+        # Validate the enum type dynamically
+        try:
+            item_type = shared.GlobalItemType[item_type_name.lower()]
+        except KeyError:
+            valid_types = ", ".join([e.name for e in shared.GlobalItemType])
+            return {"success": False, "reason": f"Invalid item type. Allowed types: {valid_types}"}
+
+        # Retrieve next ID
+        next_id = db_manager.get_next_id(shared.Table.global_shop_items)
+
+        record = db_manager.initialize_database_model(
+            shared.Table.global_shop_items,
+            item_id=next_id,
+            name=name,
+            description=description,
+            price=price,
+            item_type=item_type,
+            metadata=metadata,
+            is_dirty=True,
+            is_deleted=False
+        )
+
+        if hasattr(db_manager, "add_global_shop_items") and record:
+            db_manager.add_global_shop_items(record)
+            return {"success": True, "item": record}
+
+        return {"success": False, "reason": "Failed to add the item to the database."}

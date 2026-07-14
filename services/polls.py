@@ -1,16 +1,16 @@
 from utils import shared, helpers
 from database import database_manager, models
 import datetime
-from typing import Union, List
+from typing import Union, List, Dict
 import asyncio
 
 async def create_poll(**kwargs) -> Union[models.Poll, None]:
-    DB_MANAGER = database_manager.DB_MANAGER
-    if not DB_MANAGER:
+    db_manager = database_manager.DB_MANAGER
+    if not db_manager:
         helpers.custom_print(
             level = shared.LogLevel.CRITICAL,
             function_name = "services.polls.create_poll",
-            description = f"DB_MANAGER ({DB_MANAGER}) has not been initialized"
+            description = f"DB_MANAGER ({db_manager}) has not been initialized"
         )
         raise RuntimeError("DB_MANAGER not initialized")
     
@@ -23,7 +23,21 @@ async def create_poll(**kwargs) -> Union[models.Poll, None]:
         )
         return None
     
-    model: models.Poll = DB_MANAGER.initialize_database_model(shared.Table.polls, **kwargs)
+    next_id = db_manager.get_next_id(shared.Table.polls)
+    
+    model: models.Poll = db_manager.initialize_database_model(
+        shared.Table.polls,
+        poll_id=next_id,
+        guild_id=guild_id,
+        creator_id=creator_id,
+        question=question,
+        votes=votes,
+        is_active=is_active,
+        created_at=created_at,
+        updated_at=updated_at,
+        ends_at=ends_at,
+        is_dirty=is_dirty
+    )
     
     if not model:
         helpers.custom_print(
@@ -33,21 +47,21 @@ async def create_poll(**kwargs) -> Union[models.Poll, None]:
         )
         raise RuntimeError("Database model not initialized")
         
-    DB_MANAGER.add_polls(model)
+    db_manager.add_polls(model)
     return model
 
 async def vote_poll(poll_id: int, guild_id: int, user_id: int, option: str) -> bool:
-    DB_MANAGER = database_manager.DB_MANAGER
-    if not DB_MANAGER:
+    db_manager = database_manager.DB_MANAGER
+    if not db_manager:
         helpers.custom_print(
             level = shared.LogLevel.CRITICAL,
             function_name = "services.polls.vote_poll",
-            description = f"DB_MANAGER ({DB_MANAGER}) has not been initialized"
+            description = f"DB_MANAGER ({db_manager}) has not been initialized"
         )
         raise RuntimeError("DB_MANAGER not initialized")
     
     poll = next((
-        p for p in DB_MANAGER.polls
+        p for p in db_manager.polls
         if p.poll_id == poll_id and p.guild_id == guild_id and
         p.is_active and not p.is_deleted
     ), None)
@@ -78,17 +92,17 @@ async def vote_poll(poll_id: int, guild_id: int, user_id: int, option: str) -> b
     return True
 
 async def cancel_vote_poll(poll_id: int, guild_id: int, user_id: int) -> bool:
-    DB_MANAGER = database_manager.DB_MANAGER
-    if not DB_MANAGER:
+    db_manager = database_manager.DB_MANAGER
+    if not db_manager:
         helpers.custom_print(
             level = shared.LogLevel.CRITICAL,
             function_name = "services.polls.cancel_vote_poll",
-            description = f"DB_MANAGER ({DB_MANAGER}) has not been initialized"
+            description = f"DB_MANAGER ({db_manager}) has not been initialized"
         )
         raise RuntimeError("DB_MANAGER not initialized")
     
     poll = next((
-        p for p in DB_MANAGER.polls
+        p for p in db_manager.polls
         if p.poll_id == poll_id and p.guild_id == guild_id and
         p.is_active and not p.is_deleted
     ), None)
@@ -111,24 +125,24 @@ async def cancel_vote_poll(poll_id: int, guild_id: int, user_id: int) -> bool:
     return found_voter
 
 async def end_poll(poll_id: int, creator_id: int, guild_id: int) -> bool:
-    DB_MANAGER = database_manager.DB_MANAGER
-    if not DB_MANAGER:
+    db_manager = database_manager.DB_MANAGER
+    if not db_manager:
         helpers.custom_print(
             level = shared.LogLevel.CRITICAL,
             function_name = "services.polls.end_poll",
-            description = f"DB_MANAGER ({DB_MANAGER}) has not been initialized"
+            description = f"DB_MANAGER ({db_manager}) has not been initialized"
         )
         raise RuntimeError("DB_MANAGER not initialized")
     
     poll = next((
-        p for p in DB_MANAGER.polls
+        p for p in db_manager.polls
         if p.poll_id == poll_id and p.guild_id == guild_id and
         p.creator_id == creator_id and
         p.is_active and not p.is_deleted
     ), None)
     
     if not poll:
-        poll = DB_MANAGER.polls[0]
+        poll = db_manager.polls[0]
         helpers.custom_print(
             level = shared.LogLevel.DEBUG,
             function_name = "services.polls.end_poll",
@@ -142,17 +156,17 @@ async def end_poll(poll_id: int, creator_id: int, guild_id: int) -> bool:
     return True
 
 async def get_active_polls(user_id: int, guild_id: int) -> Union[List[models.Poll], None]:
-    DB_MANAGER = database_manager.DB_MANAGER
-    if not DB_MANAGER:
+    db_manager = database_manager.DB_MANAGER
+    if not db_manager:
         helpers.custom_print(
             level = shared.LogLevel.CRITICAL,
             function_name = "services.polls.get_active_polls",
-            description = f"DB_MANAGER ({DB_MANAGER}) has not been initialized"
+            description = f"DB_MANAGER ({db_manager}) has not been initialized"
         )
         raise RuntimeError("DB_MANAGER not initialized")
     
     active_polls = [
-        p for p in DB_MANAGER.polls
+        p for p in db_manager.polls
         if p.is_active and not p.is_deleted and
         p.creator_id == user_id and p.guild_id == guild_id
     ]
@@ -161,18 +175,18 @@ async def get_active_polls(user_id: int, guild_id: int) -> Union[List[models.Pol
     
     return active_polls
 
-async def _sleep_and_finish_poll(poll_id: int, guild_id: int, ends_at: datetime.datetime):
-    DB_MANAGER = database_manager.DB_MANAGER
-    if not DB_MANAGER:
+async def _sleep_and_close_poll(poll_id: int, guild_id: int, ends_at: datetime.datetime):
+    db_manager = database_manager.DB_MANAGER
+    if not db_manager:
         helpers.custom_print(
             level = shared.LogLevel.CRITICAL,
             function_name = "services.polls.get_active_polls",
-            description = f"DB_MANAGER ({DB_MANAGER}) has not been initialized"
+            description = f"DB_MANAGER ({db_manager}) has not been initialized"
         )
         raise RuntimeError("DB_MANAGER not initialized")
     
     poll = next((
-        p for p in DB_MANAGER.polls
+        p for p in db_manager.polls
         if p.poll_id == poll_id and guild_id == guild_id and
         p.is_active and not p.is_deleted
     ), None)
@@ -188,11 +202,11 @@ async def _sleep_and_finish_poll(poll_id: int, guild_id: int, ends_at: datetime.
     await end_poll(poll_id = poll_id, creator_id = poll.creator_id, guild_id = guild_id)
 
     user = next((
-        u for u in DB_MANAGER.users
+        u for u in db_manager.users
         if u.user_id == poll.creator_id
     ), None)
     helpers.custom_print(
         level = shared.LogLevel.DEBUG,
-        function_name = "services.polls._sleep_and_finish_poll",
+        function_name = "services.polls._sleep_and_close_poll",
         description = f"User {user.username if user else poll.creator_id}'s poll ({poll_id}) in Guild ID {guild_id} has ended automatically"
     )

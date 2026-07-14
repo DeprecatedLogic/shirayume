@@ -13,16 +13,22 @@ def add_moderation_logs(**kwargs) -> Optional[models.ModerationLog]:
     Returns:
         Optional[models.ModerationLog]: _description_
     """
-    DB_MANAGER = database_manager.DB_MANAGER
-    if not DB_MANAGER:
+    db_manager = database_manager.DB_MANAGER
+    if not db_manager:
         helpers.custom_print(
             level = shared.LogLevel.CRITICAL,
             function_name = "add_moderation_logs",
-            description = f"DB_MANAGER ({DB_MANAGER}) has not been initialized"
+            description = f"DB_MANAGER ({db_manager}) has not been initialized"
         )
         raise RuntimeError("DB_MANAGER not initialized")
 
-    model = DB_MANAGER.initialize_database_model(shared.Table.moderation_logs, **kwargs)
-    DB_MANAGER.add_moderation_logs(model)
+    next_id = db_manager.get_next_id(shared.Table.moderation_logs)
+
+    model = db_manager.initialize_database_model(
+        shared.Table.moderation_logs,
+        mlog_id=next_id,
+        **kwargs
+    )
+    db_manager.add_moderation_logs(model)
     
     return model

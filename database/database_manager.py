@@ -31,6 +31,14 @@ PRIMARY_KEYS = {
     shared.Table.global_shop_items: ["item_id"],
 }
 
+# Pre-defined mapping of tables that require in-memory auto-increment IDs to their column name
+AUTO_INCREMENT_FIELDS = {
+    shared.Table.moderation_logs: "mlog_id",
+    shared.Table.polls: "poll_id",
+    shared.Table.shop_items: "item_id",
+    shared.Table.global_shop_items: "item_id",
+}
+
 class DatabaseManager:
 
     def __init__(self, DB_HOST: str, DB_USER: str, DB_PASSWORD: str, DATABASE: str) -> None:
@@ -70,6 +78,9 @@ class DatabaseManager:
         # SQL cache
         self._sql_cache = {}
 
+        # Last IDs cache
+        self._last_id_cache = {}
+
         try:
             self.db_connection = mysql.connector.connect(
                 host=DB_HOST,
@@ -96,7 +107,8 @@ class DatabaseManager:
             raise
 
     def _key(self, table, obj):
-        """_summary_
+        """
+        _summary_
 
         Args:
             table (_type_): _description_
@@ -113,7 +125,8 @@ class DatabaseManager:
         return tuple(getattr(obj,pk) for pk in pkeys)
 
     def mark_dirty(self, table, obj) -> None:
-        """_summary_
+        """
+        _summary_
 
         Args:
             table (_type_): _description_
@@ -123,12 +136,9 @@ class DatabaseManager:
         self._dirty[table].add(obj)
 
     def _add(self, table, items, set_dirty: bool = True) -> None:
-        """_summary_
-
-        Args:
-            table (_type_): _description_
-            items (_type_): _description_
-            set_dirty (bool): _description_
+        """
+        Adds item(s) to the in-memory cache, replacing existing items 
+        with the same primary key if they exist.
         """
         if not isinstance(items, list):
             items = [items]
@@ -140,8 +150,24 @@ class DatabaseManager:
             key = self._key(table, item)
 
             if key in index:
-                continue
+                old_item = index[key]
+                
+                # If same memory reference (un-delete / update if needed)
+                if old_item is item:
+                    old_item.is_deleted = False
+                    if set_dirty:
+                        self.mark_dirty(table, old_item)
+                    continue
 
+                # If new object reference replacing an old one
+                if old_item in storage:
+                    storage.remove(old_item)
+                
+                # Safely discard the old object from dirty tracking 
+                # (the new object will overwrite it in the DB on commit)
+                self._dirty[table].discard(old_item)
+
+            # Insert the new item into active storage and the index
             item.is_deleted = False
             storage.append(item)
             index[key] = item
@@ -188,6 +214,12 @@ class DatabaseManager:
                 "required":required
             }
 
+            helpers.custom_print(
+                level=shared.LogLevel.DEBUG,
+                function_name="database.database_manager.DatabaseManager._initialize_schema",
+                description=f"Required fields for table {table_name}: {'/'.join(required)}"
+            )
+
             pkeys = PRIMARY_KEYS[table]
 
             placeholders = ", ".join(["%s"]*len(columns))
@@ -219,6 +251,16 @@ class DatabaseManager:
                 {update_str}
                 """
             }
+
+
+    def get_next_id(self, table: shared.Table) -> int:
+        """
+        Gets and increments the next available ID for an auto-increment table.
+        """
+        if table not in self._last_id_cache:
+            self._last_id_cache[table] = 0
+        self._last_id_cache[table] += 1
+        return self._last_id_cache[table]
 
 
     def add_users(self, users: Union[List[models.User], models.User]) -> None:
@@ -652,6 +694,12 @@ def setup(DB_HOST: str, DB_USER: str, DB_PASSWORD: str, DATABASE: str) -> None:
             
             DB_MANAGER._add(table, models_list, set_dirty=False)
             
+            # Determine and cache the maximum ID for tables designated for auto-incrementing
+            if table in AUTO_INCREMENT_FIELDS:
+                auto_inc_col = AUTO_INCREMENT_FIELDS[table]
+                max_id = max((getattr(model, auto_inc_col) for model in models_list), default=0)
+                DB_MANAGER._last_id_cache[table] = max_id
+
             helpers.custom_print(
                 level = shared.LogLevel.DEBUG,
                 function_name = "database.DatabaseManager.setup",

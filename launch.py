@@ -1,35 +1,18 @@
 import os
 import dotenv
-from database import database_manager
-from cogs import agent, moderation, local_economy, global_economy, polls, rankings, web_scraping, statistics
-from cogs.admin import utilities as admin_utilities, database as admin_database
-from cogs.minigames import basic
+from utils import shared, helpers
+from cogs import agent, moderation, polls, statistics
+from cogs.economy import local as local_economy, global_eco as global_economy
+from cogs.admin import utilities as admin_utilities, database as admin_database, economy as admin_economy
+from cogs.minigames import basic as basic_minigames
 import discord
 from discord.ext import commands
 import json
-#import asyncio
-from utils import shared, helpers
 from database import database_manager, models
 from datetime import datetime
 from typing import List
 from time import sleep
 import asyncio
-
-def get_new_year() -> datetime:
-    """ Get new year's datetime. """
-
-    # Set New Year date
-    year = datetime.today().year + 1
-
-    # Only if New Year set date to today
-    if datetime.today().day == datetime.today().month == 1:
-        year -= 1
-
-    return datetime(
-        year = year,
-        month = 1,
-        day = 1
-    )
 
 async def setup_bot() -> None:
     DB_MANAGER = database_manager.DB_MANAGER
@@ -99,9 +82,12 @@ class ShirayumeBot(commands.Bot):
             help_command=None
         )
 
+        self.token = ""
+
     async def setup_hook(self):
         await admin_utilities.setup()
         await admin_database.setup()
+        await admin_economy.setup()
 
         await agent.setup()
         await moderation.setup()
@@ -109,28 +95,9 @@ class ShirayumeBot(commands.Bot):
         await global_economy.setup()
         await polls.setup()
         await statistics.setup()
-        #rankings.setup()
-        #web_scraping.setup()
-        await basic.setup()
+        await basic_minigames.setup()
 
-        try:
-            #GUILD_ID = 1183463468020531343
-            #synced_guild = await shared.SHIRAYUME.tree.sync(guild = shared.SHIRAYUME.get_guild(GUILD_ID))
-            #print(f"Synced {len(synced_guild)} commands to guild {shared.SHIRAYUME.get_guild(GUILD_ID).name}")
-            synced = await self.tree.sync()
-
-            helpers.custom_print(
-                level=shared.LogLevel.INFO,
-                function_name="ShirayumeBot.setup_hook",
-                description=f"Synced {len(synced)} commands globally."
-            )
-
-        except Exception as e:
-            helpers.custom_print(
-                level=shared.LogLevel.ERROR,
-                function_name="ShirayumeBot.setup_hook",
-                description=f"Failed to sync commands: {e}"
-            )
+        await helpers.update_default_color()
 
     async def on_ready(self):
         helpers.custom_print(
@@ -141,31 +108,55 @@ class ShirayumeBot(commands.Bot):
 
         await setup_bot()
 
-shared.SHIRAYUME = ShirayumeBot()
-
 async def launch() -> None:
 
-    with open("config.json", "r") as config_file:
-        config: dict = json.load(config_file)
-        new_year = get_new_year()
+    def get_new_year() -> datetime:
+        """ Get new year's datetime. """
 
-        shared.GLOBAL_CONFIG = config
-        shared.GLOBAL_CONFIG["new_year"] = new_year
-        shared.SHIRAYUME.command_prefix = config["bot_prefix"]
+        # Set New Year date
+        year = datetime.today().year + 1
 
-        helpers.custom_print(
-            level = shared.LogLevel.INFO,
-            function_name = "launch",
-            description = f"Loaded config"
+        # Only if New Year set date to today
+        if datetime.today().day == datetime.today().month == 1:
+            year -= 1
+
+        return datetime(
+            year = year,
+            month = 1,
+            day = 1
         )
+
+    try:
+        with open("config.json", "r") as config_file:
+            config: dict = json.load(config_file)
+            new_year = get_new_year()
+
+            shared.GLOBAL_CONFIG = config
+            shared.GLOBAL_CONFIG["new_year"] = new_year
+
+            shared.SHIRAYUME = ShirayumeBot()
+            shared.SHIRAYUME.command_prefix = config["bot_prefix"]
+
+            helpers.custom_print(
+                level=shared.LogLevel.INFO,
+                function_name="launch",
+                description=f"Loaded config"
+            )
+    except OSError:
+        helpers.custom_print(
+            level=shared.LogLevel.CRITICAL,
+            function_name="launch",
+            description="Failed to open config.json file in read mode"
+        )
+        return
     
     if not dotenv.load_dotenv(dotenv_path = dotenv.find_dotenv(filename = ".env")):
         helpers.custom_print(
-            level = shared.LogLevel.CRITICAL,
-            function_name = "launch",
-            description = "No .env file found or failed to load."
+            level=shared.LogLevel.CRITICAL,
+            function_name="launch",
+            description="No .env file found or failed to load"
         )
-        exit()
+        return
 
     DB_HOST = os.environ["DB_HOST"]
     DB_USER = os.environ["DB_USER"]
@@ -173,37 +164,49 @@ async def launch() -> None:
     DATABASE = os.environ["DATABASE"]
     DISCORD_TOKEN = os.environ["DISCORD_TOKEN"]
 
+    shared.SHIRAYUME.token = DISCORD_TOKEN
+
     # Debugging output
     helpers.custom_print(
-        level = shared.LogLevel.DEBUG,
-        function_name = "launch",
-        description = f"""
+        level=shared.LogLevel.DEBUG,
+        function_name="launch",
+        description=f"""
         Bot Prefix: {shared.SHIRAYUME.command_prefix}
         DB Host: {DB_HOST}
         DB User: {DB_USER}
         DB Password: {DB_PASSWORD}
         Database: {DATABASE}
         Token: {DISCORD_TOKEN}
-
         """
     )
     database_manager.setup(DB_HOST, DB_USER, DB_PASSWORD, DATABASE)
 
     try:
         await shared.SHIRAYUME.start(DISCORD_TOKEN, reconnect=True)
+    except KeyboardInterrupt:
+        pass
     finally:
+        print("")
+        helpers.custom_print(
+            level=shared.LogLevel.INFO,
+            function_name="launch",
+            description=f"Shutting down Shirayume..."
+        )
         await shared.SHIRAYUME.close()
         helpers.custom_print(
-            level = shared.LogLevel.INFO,
-            function_name = "launch",
-            description = f"Shirayume shutdown successfully"
+            level=shared.LogLevel.INFO,
+            function_name="launch",
+            description=f"Shirayume shutdown successfully"
         )
         await database_manager.DB_MANAGER.database_close()
         helpers.custom_print(
-            level = shared.LogLevel.INFO,
-            function_name = "launch",
-            description = f"Database connection closed gracefully"
+            level=shared.LogLevel.INFO,
+            function_name="launch",
+            description=f"Database connection closed gracefully"
         )
 
 if __name__ == "__main__":
-    asyncio.run(launch())
+    try:
+        asyncio.run(launch())
+    except KeyboardInterrupt:
+        pass
