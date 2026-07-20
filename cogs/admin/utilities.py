@@ -12,12 +12,17 @@ class AdminUtils(commands.Cog):
     @commands.is_owner()
     @commands.command(name="shutdown")
     async def shutdown(self, ctx: commands.Context, delay: int = 0) -> None:
-        """ Disconnects bot by closing the client."""
+        """
+        Disconnects bot by closing the client.
+        
+        Args:
+            ctx (commands.Context): Represents the context in which a command is being invoked under.
+            delay (int): Amount of seconds to delay the shutdown.
+        """
 
         embed = helpers.embed_generator(
             title="Shutting Down",
             description="Vanishing into the void... Please, delete my browser history :saluting_face:",
-            color=(205, 85, 0)
         )
         await ctx.send(embed=embed)
         
@@ -28,8 +33,10 @@ class AdminUtils(commands.Cog):
     @commands.guild_only()
     @commands.is_owner()
     @commands.command(name="sync")
-    async def sync(self, ctx: commands.Context, guilds: commands.Greedy[discord.Object],
-                spec: Optional[Literal["~", "*", "^"]] = None) -> None:
+    async def sync(
+        self, ctx: commands.Context, guilds: commands.Greedy[discord.Object],
+        spec: Optional[Literal["~", "*", "^"]] = None
+    ) -> None:
         """
         Syncs commands based on spec.
         
@@ -77,7 +84,6 @@ class AdminUtils(commands.Cog):
             except discord.HTTPException as e:
                 helpers.custom_print(
                     level=shared.LogLevel.INFO,
-                    function_name="sync",
                     description=f"An HTTP exception has occured: {e}"
                 )
             else:
@@ -99,41 +105,38 @@ class AdminUtils(commands.Cog):
     async def help(self, ctx: commands.Context, args: str = None) -> None:
         """ Help Command.
         
-        Parameters
-        ----------
-        - `ctx`: `commands.Context`
-            - The context in which a command is being invoked under.
-        - `args`: `str`
-            - The command's name to get help for.
-        
+        Args:
+            ctx (commands.Context): The context in which a command is being invoked under.
+            args (str): The command's name to get help for.
         """
-
         embed = helpers.embed_generator(
             title="===== List of supported commands =====",
-            description="",
-            color=(255, 48, 72)
+            description=""
         )
 
-        slash_comm_names = [comm.name for comm in shared.SHIRAYUME.commands]
-        prefix_comm_names = shared.SHIRAYUME.all_commands.keys()
+        # Retrieve slash commands from the CommandTree
+        slash_commands = list(shared.SHIRAYUME.tree.walk_commands())
+        slash_comm_names = [comm.name for comm in slash_commands]
+        
+        # Retrieve prefix commands (excluding aliases to prevent duplicates)
+        prefix_commands = list(shared.SHIRAYUME.commands)
+        prefix_comm_names = [comm.name for comm in prefix_commands]
 
-        # No arguments?
         if not args:
-
-            prefix_commands = [str(i + 1) + ". " + comm_name for i, comm_name in enumerate(prefix_comm_names, start = 0)]
-            slash_commands = [str(i + 1) + ". " + comm_name for i, comm_name in enumerate(slash_comm_names, start = 0)]
+            prefix_list = [f"{i + 1}. {name}" for i, name in enumerate(prefix_comm_names)]
+            slash_list = [f"{i + 1}. {name}" for i, name in enumerate(slash_comm_names)]
 
             name = "Prefix Commands"
             embed.add_field(
                 name=name,
-                value='-' * len(name) + '\n' + "\n".join(prefix_commands),
+                value='-' * len(name) + '\n' + ("\n".join(prefix_list) if prefix_list else "None"),
                 inline=False
             )
 
             name = "Slash Commands"
             embed.add_field(
                 name=name,
-                value='-' * len(name) + '\n' + "\n".join(slash_commands),
+                value='-' * len(name) + '\n' + ("\n".join(slash_list) if slash_list else "None"),
                 inline=False
             )
 
@@ -146,10 +149,19 @@ class AdminUtils(commands.Cog):
             )
 
         elif args in slash_comm_names:
+            command = next(c for c in slash_commands if c.name == args)
             embed.add_field(
                 name=args,
-                value=shared.SHIRAYUME.get_command(args).help
+                value=command.description or "No description provided."
             )
+            
+        elif args in prefix_comm_names:
+            command = next(c for c in prefix_commands if c.name == args)
+            embed.add_field(
+                name=args,
+                value=command.help or "No description provided."
+            )
+            
         else:
             embed.add_field(
                 name="Couldn't find that command!",
@@ -161,12 +173,12 @@ class AdminUtils(commands.Cog):
     @commands.is_owner()
     @commands.command(name="upload_pfp")
     async def upload_pfp(self, ctx: commands.Context, image_path: str = None) -> None:
-        """ Uploads a profile picture for the bot.
+        """
+        Uploads a profile picture for the bot.
         
-        Parameters
-        ----------
-        - ctx (commands.Context): The context in which a command is being invoked under.
-        - image_path (str): The path of the image to upload as a profile picture.
+        Args:
+            ctx (commands.Context): The context in which a command is being invoked under.
+            image_path (str): The path of the image to upload as a profile picture.
         
         """
         user = ctx.message.author.global_name
@@ -174,7 +186,6 @@ class AdminUtils(commands.Cog):
         if not image_path:
             helpers.custom_print(
                 level=shared.LogLevel.INFO,
-                function_name="cogs.Admin.upload_pfp",
                 description="Image path is empty."
             )
             embed = helpers.embed_generator(
@@ -203,7 +214,6 @@ class AdminUtils(commands.Cog):
             elif suffix not in ("jpeg", "png", "gif"):
                 helpers.custom_print(
                     level=shared.LogLevel.DEBUG,
-                    function_name="cogs.Admin.upload_pfp",
                     description=f"File suffix is {suffix}"
                 )
                 raise Exception("File suffix is invalid")
@@ -235,12 +245,10 @@ class AdminUtils(commands.Cog):
 
                 helpers.custom_print(
                     level=shared.LogLevel.INFO,
-                    function_name="cogs.Admin.upload_pfp",
-                    description=f"HTML Request Error: Response status code is {response.status_code} instead of 200"
+                    description=f"HTML Request Error: Response status code is {response.status_code} instead of 200."
                 )
                 helpers.custom_print(
                     level=shared.LogLevel.INFO,
-                    function_name="cogs.Admin.upload_pfp",
                     description=f"Response json: {response.json()}"
                 )
                 return
@@ -255,7 +263,6 @@ class AdminUtils(commands.Cog):
             
             helpers.custom_print(
                 level=shared.LogLevel.INFO,
-                function_name="cogs.Admin.upload_pfp",
                 description="Profile picture uploaded!"
             )
 
@@ -268,28 +275,23 @@ class AdminUtils(commands.Cog):
             await msg.edit(embed=embed)
             helpers.custom_print(
                 level=shared.LogLevel.ERROR,
-                function_name="cogs.Admin.upload_pfp",
                 description=f"Failed to upload the profile picture, exception: {e}"
             )
 
     @commands.is_owner()
     @commands.command(name="upload_banner")
     async def upload_banner(self, ctx: commands.Context, image_path: str = None) -> None:
-        """ Uploads a banner for the bot.
+        """
+        Uploads a banner for the bot.
         
-        Parameters
-        ----------
-        - `ctx`: `commands.Context`
-            - The context in which a command is being invoked under.
-        - `image_path`: `str`
-            - The path of the image to upload as a banner.
-        
+        Args:
+            ctx (commands.Context): The context in which a command is being invoked under.
+            image_path (str): The path of the image to upload as a banner.
         """
         user = ctx.message.author.global_name
         
         if not image_path:
             helpers.custom_print(
-                function_name="cogs.Admin.upload_banner",
                 level=shared.LogLevel.INFO,
                 description="Image path is empty"
             )
@@ -320,7 +322,6 @@ class AdminUtils(commands.Cog):
             elif suffix not in ("jpeg", "png", "gif"):
                 helpers.custom_print(
                     level=shared.LogLevel.DEBUG,
-                    function_name="cogs.Admin.upload_pfp",
                     description=f"File suffix is {suffix}"
                 )
                 raise Exception("File suffix is invalid")
@@ -353,12 +354,10 @@ class AdminUtils(commands.Cog):
 
                 helpers.custom_print(
                     level=shared.LogLevel.INFO,
-                    function_name="cogs.Admin.upload_banner",
                     description=f"HTML Request Error: Response status code is {response.status_code} instead of 200",
                 )
                 helpers.custom_print(
                     level=shared.LogLevel.INFO,
-                    function_name="cogs.Admin.upload_banner",
                     description=f"Response json: {response.json()}",
                 )
                 return
@@ -373,7 +372,6 @@ class AdminUtils(commands.Cog):
 
             helpers.custom_print(
                 level=shared.LogLevel.INFO,
-                function_name="cogs.Admin.upload_banner",
                 description="Banner uploaded",
             )
 
@@ -387,7 +385,6 @@ class AdminUtils(commands.Cog):
 
             helpers.custom_print(
                 level=shared.LogLevel.INFO,
-                function_name="cogs.Admin.upload_banner",
                 description=f"Failed to upload the banner, exception: {e}",
             )
 
@@ -395,6 +392,5 @@ async def setup() -> None:
     await shared.SHIRAYUME.add_cog(AdminUtils(), override=True)
     helpers.custom_print(
         level=shared.LogLevel.DEBUG,
-        function_name="cogs.admin.utilities.setup",
-        description="Setup completed successfully"
+        description="Admin utilities cog setup completed successfully."
     )
