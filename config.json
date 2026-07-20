@@ -31,7 +31,7 @@
         },
         "economy": {
             "local": {
-                "is_enabled": true,
+                "is_enabled": false,
                 "shop_enabled": true
             },
             "global": {
@@ -70,7 +70,11 @@
             }
         },
         "agent": {
-            "is_enabled": true
+            "is_enabled": false
+        },
+        "polls": {
+            "is_enabled": true,
+            "max_active_per_user": 3
         }
     }
 }

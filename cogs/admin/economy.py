@@ -50,7 +50,6 @@ class AdminEconomy(commands.Cog):
             
             helpers.custom_print(
                 level=shared.LogLevel.INFO,
-                function_name="cogs.Admin.add_global_item",
                 description=f"Global item '{name}' added successfully."
             )
         else:
@@ -76,6 +75,5 @@ async def setup() -> None:
     await shared.SHIRAYUME.add_cog(AdminEconomy(), override=True)
     helpers.custom_print(
         level=shared.LogLevel.DEBUG,
-        function_name="cogs.admin.economy.setup",
-        description="Setup completed successfully"
+        description="Admin economy cog setup completed successfully."
     )

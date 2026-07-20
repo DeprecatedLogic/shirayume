@@ -5,14 +5,11 @@ from utils import shared, helpers
 
 class EconomyService:
     """
-    Handles all business logic for the local server economy.
-    Strictly isolated from the Discord API.
+    Manages all local economy configuration logic, item shop transactions, 
+    and balance records isolated from direct API calls.
     """
 
     def __init__(self) -> None:
-        """
-        Initializes the EconomyService.
-        """
         pass
 
     def _get_db_guild(self, guild_id: int) -> Optional[Any]:
@@ -25,10 +22,7 @@ class EconomyService:
         Returns:
             Optional[Any]: The Guild model object, or None if not found.
         """
-        db_manager = database_manager.DB_MANAGER
-        if not db_manager:
-            return None
-        return next((g for g in db_manager.guilds if g.guild_id == guild_id), None)
+        return next((g for g in database_manager.DB_MANAGER.guilds if g.guild_id == guild_id), None)
 
     def _get_user_record(self, guild_id: int, user_id: int) -> Optional[Any]:
         """
@@ -39,18 +33,14 @@ class EconomyService:
             user_id (int): The ID of the user.
 
         Returns:
-            Optional[Any]: The UserEconomy model object, or None if the DB is unavailable.
+            Optional[Any]: The UserEconomy model object.
         """
-        db_manager = database_manager.DB_MANAGER
-        if not db_manager:
-            return None
-        
-        record = next((ue for ue in getattr(db_manager, "user_economies", []) if ue.guild_id == guild_id and ue.user_id == user_id), None)
+        record = next((ue for ue in getattr(database_manager.DB_MANAGER, "user_economies", []) if ue.guild_id == guild_id and ue.user_id == user_id), None)
         
         if not record:
             # Use safe default for MySQL to avoid out-of-range datetime errors
             safe_min_time = datetime.datetime(2000, 1, 1)
-            record = db_manager.initialize_database_model(
+            record = database_manager.DB_MANAGER.initialize_database_model(
                 shared.Table.user_economies,
                 guild_id=guild_id,
                 user_id=user_id,
@@ -59,8 +49,12 @@ class EconomyService:
                 is_dirty=True,
                 is_deleted=False
             )
-            if hasattr(db_manager, "add_user_economies") and record:
-                db_manager.add_user_economies(record)
+            if hasattr(database_manager.DB_MANAGER, "add_user_economies") and record:
+                database_manager.DB_MANAGER.add_user_economies(record)
+                helpers.custom_print(
+                    level=shared.LogLevel.DEBUG,
+                    description=f"Initialized new local economy tracking profile for user ID {user_id} in guild ID {guild_id}."
+                )
             
         return record
 
@@ -92,6 +86,7 @@ class EconomyService:
         Returns:
             int: The updated balance. Returns the current balance if the amount is invalid.
         """
+
         if amount <= 0:
             return self.get_balance(guild_id, user_id)
             
@@ -101,6 +96,10 @@ class EconomyService:
             
         record.local_balance += amount
         database_manager.DB_MANAGER.mark_dirty(shared.Table.user_economies, record)
+        helpers.custom_print(
+            level=shared.LogLevel.DEBUG,
+            description=f"Added {amount} local currency to user ID {user_id} in guild ID {guild_id}."
+        )
         return record.local_balance
 
     def remove_balance(self, guild_id: int, user_id: int, amount: int) -> bool:
@@ -115,15 +114,24 @@ class EconomyService:
         Returns:
             bool: True if the deduction was successful, False if insufficient funds.
         """
+
         if amount <= 0:
             return False
             
         record = self._get_user_record(guild_id, user_id)
         if not record or record.local_balance < amount:
+            helpers.custom_print(
+                level=shared.LogLevel.DEBUG,
+                description=f"Failed balance removal: User ID {user_id} lacks {amount} credits in guild ID {guild_id}."
+            )
             return False
             
         record.local_balance -= amount
         database_manager.DB_MANAGER.mark_dirty(shared.Table.user_economies, record)
+        helpers.custom_print(
+            level=shared.LogLevel.DEBUG,
+            description=f"Removed {amount} local currency from user ID {user_id} in guild ID {guild_id}."
+        )
         return True
 
     def transfer_funds(self, guild_id: int, sender_id: int, receiver_id: int, amount: int) -> bool:
@@ -142,8 +150,13 @@ class EconomyService:
         if amount <= 0 or sender_id == receiver_id:
             return False
             
+        # Execute atomic withdrawal before verifying drop points
         if self.remove_balance(guild_id, sender_id, amount):
             self.add_balance(guild_id, receiver_id, amount)
+            helpers.custom_print(
+                level=shared.LogLevel.INFO,
+                description=f"Transferred {amount} local credits from user ID {sender_id} to user ID {receiver_id} in guild ID {guild_id}."
+            )
             return True
             
         return False
@@ -159,6 +172,7 @@ class EconomyService:
         Returns:
             int: The amount of currency rewarded. Returns 0 if rate-limited or disabled.
         """
+
         db_guild = self._get_db_guild(guild_id)
         if not db_guild or not getattr(db_guild, "economy_enabled", True):
             return 0
@@ -195,13 +209,10 @@ class EconomyService:
         Returns:
             Dict[str, Any]: A dictionary representing the item.
         """
-        db_manager = database_manager.DB_MANAGER
-        if not db_manager:
-            return {}
             
         item = next((
             item
-            for item in getattr(db_manager, "shop_items", [])
+            for item in getattr(database_manager.DB_MANAGER, "shop_items", [])
             if item.guild_id == guild_id and item.item_id == item_id and not getattr(item, "is_deleted", False)
         ), None)
         
@@ -226,11 +237,8 @@ class EconomyService:
         Returns:
             List[Dict[str, Any]]: A list of dictionaries representing the shop inventory.
         """
-        db_manager = database_manager.DB_MANAGER
-        if not db_manager:
-            return []
             
-        items = [item for item in getattr(db_manager, "shop_items", []) if item.guild_id == guild_id and not item.is_deleted]
+        items = [item for item in getattr(database_manager.DB_MANAGER, "shop_items", []) if item.guild_id == guild_id and not item.is_deleted]
         
         return [
             {
@@ -257,19 +265,10 @@ class EconomyService:
         Returns:
             bool: True if added successfully, False otherwise.
         """
-        db_manager = database_manager.DB_MANAGER
-        if not db_manager:
-            helpers.custom_print(
-                level = shared.LogLevel.CRITICAL,
-                function_name = "services.polls.create_poll",
-                description = f"DB_MANAGER ({db_manager}) has not been initialized"
-            )
-            raise RuntimeError("DB_MANAGER not initialized")
             
-        # Retrieve next ID
-        next_id = db_manager.get_next_id(shared.Table.shop_items)
+        next_id = database_manager.DB_MANAGER.get_next_id(shared.Table.shop_items, guild_id)
 
-        record = db_manager.initialize_database_model(
+        record = database_manager.DB_MANAGER.initialize_database_model(
             shared.Table.shop_items,
             item_id=next_id,
             guild_id=guild_id,
@@ -281,8 +280,12 @@ class EconomyService:
             is_deleted=False
         )
         
-        if hasattr(db_manager, "add_shop_items") and record:
-            db_manager.add_shop_items(record)
+        if hasattr(database_manager.DB_MANAGER, "add_shop_items") and record:
+            database_manager.DB_MANAGER.add_shop_items(record)
+            helpers.custom_print(
+                level=shared.LogLevel.INFO,
+                description=f"Created new local shop item ID {next_id} (Name: {name}) for guild ID {guild_id}."
+            )
             return True
 
         return False
@@ -298,19 +301,20 @@ class EconomyService:
         Returns:
             bool: True if the item was found and deleted, False otherwise.
         """
-        db_manager = database_manager.DB_MANAGER
-        if not db_manager:
-            return False
             
         item = next((
-            item for item in getattr(db_manager, "shop_items", []) 
+            item for item in getattr(database_manager.DB_MANAGER, "shop_items", []) 
             if item.guild_id == guild_id and item.item_id == item_id and not getattr(item, "is_deleted", False)
         ), None)
         
         if not item:
             return False
 
-        db_manager.remove_shop_items(item_id)
+        database_manager.DB_MANAGER.remove_shop_items(item_id)
+        helpers.custom_print(
+            level=shared.LogLevel.INFO,
+            description=f"Soft-deleted local shop item ID {item_id} from guild ID {guild_id}."
+        )
         return True
 
     def get_guild_currency(self, guild_id: int) -> str:
@@ -326,7 +330,6 @@ class EconomyService:
         db_guild = self._get_db_guild(guild_id)
         if db_guild:
             return getattr(db_guild, "currency", "Credits")
-        # todo: if no guild, ADD the guild ?!
         return "Credits"
 
     def purchase_item(self, guild_id: int, user_id: int, item_id: int) -> Dict[str, Any]:
@@ -349,7 +352,12 @@ class EconomyService:
             
         price = item["price"]
         
+        # Atomically remove balance to settle transaction safely
         if self.remove_balance(guild_id, user_id, price):
+            helpers.custom_print(
+                level=shared.LogLevel.INFO,
+                description=f"User ID {user_id} successfully bought item ID {item_id} in local shop of guild ID {guild_id}."
+            )
             return {"success": True, "item": item}
         else:
             return {"success": False, "reason": "Insufficient funds."}

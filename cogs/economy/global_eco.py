@@ -19,14 +19,23 @@ class GlobalEconomy(shared.GroupedCog):
     
     @app_commands.command(name="profile", description="View your global profile, including Yume Coins and other global statistics.")
     async def view_profile(self, interaction: discord.Interaction, target: discord.Member = None) -> None:
+        """
+        Fetches and displays a user's global profile, showing balance and custom items.
+
+        Args:
+            interaction (discord.Interaction): The interaction object.
+            target (discord.Member, optional): The member to view. Defaults to None.
+        """
         user_to_check = target or interaction.user
         db_user = self.service._get_user(user_to_check.id)
         
+        # If user isn't in DB, they haven't used the bot yet
         if not db_user:
+            helpers.custom_print(level=shared.LogLevel.DEBUG, description=f"Profile lookup failed for {user_to_check.id}")
             await interaction.response.send_message("Profile not found. Play a game to initialize!", ephemeral=True)
             return
             
-        active = db_user.active_items # TODO: add active_items to the User class in models
+        active = db_user.active_items
         color_hex = active.get("color", "ffffff").replace("#", "")
         embed_color = int(color_hex, 16) if color_hex.isalnum() else 0xffffff
 
@@ -42,8 +51,15 @@ class GlobalEconomy(shared.GroupedCog):
 
     @app_commands.command(name="shop", description="Browse items available in the global shop.")
     async def global_shop(self, interaction: discord.Interaction) -> None:
+        """
+        Displays the global shop items in a paginated view.
+
+        Args:
+            interaction (discord.Interaction): The interaction object.
+        """
         items = self.service.get_global_shop_items()
         if not items:
+            helpers.custom_print(level=shared.LogLevel.INFO, description="Global shop empty.")
             embed = helpers.embed_generator(title="Global Shop", description="The shop is currently empty.")
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
@@ -51,18 +67,27 @@ class GlobalEconomy(shared.GroupedCog):
         view = ShopPaginator(
             shop_items=items,
             user_id=interaction.user.id,
-            buy_command="",
-            shop_name=guild.name,
-            currency=currency
+            buy_command="/global buy",
+            shop_name="Global",
+            currency="Yume Coins"
         )
         await interaction.response.send_message(embed=view.generate_embed(), view=view)
         view.original_message = await interaction.original_response()
 
     @app_commands.command(name="buy", description="Purchase an item from the global shop using Yume Coins.")
     async def buy_item(self, interaction: discord.Interaction, item_id: int) -> None:
+        """
+        Handles the purchase logic for global shop items.
+
+        Args:
+            interaction (discord.Interaction): The interaction object.
+            item_id (int): The ID of the item to purchase.
+        """
         result = self.service.purchase_global_item(interaction.user.id, item_id)
         
+        # Log failures for debugging specific user transaction issues
         if not result["success"]:
+            helpers.custom_print(level=shared.LogLevel.WARNING, description=f"Global purchase failed for {interaction.user.id}: {result['reason']}")
             embed = helpers.embed_generator("Transaction Failed", result["reason"], discord.Color.red())
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
@@ -77,6 +102,12 @@ class GlobalEconomy(shared.GroupedCog):
 
     @app_commands.command(name="leaderboard", description="View the top servers ranked by Yume Points.")
     async def guild_leaderboard(self, interaction: discord.Interaction) -> None:
+        """
+        Displays the top 10 guilds ranked by Yume Points.
+
+        Args:
+            interaction (discord.Interaction): The interaction object.
+        """
         guilds = self.service.get_top_guilds(
             guild_id=interaction.guild.id,
             number_of_guilds=10
@@ -94,7 +125,7 @@ class GlobalEconomy(shared.GroupedCog):
 
 class GlobalEconomyAdmin(shared.GroupedCog):
     """
-    _summary_
+    Administrative commands for managing the Global Economy.
     """
     group = ECONOMY_ADMIN_GROUP
 
@@ -105,11 +136,12 @@ class GlobalEconomyAdmin(shared.GroupedCog):
     @app_commands.checks.has_permissions(administrator=True)
     @app_commands.command(name="tax", description="Set this server's Yume Coin tax rate (0-30%). (Admin)")
     async def set_tax(self, interaction: discord.Interaction, percentage: int = None) -> None:
-        """_summary_
+        """
+        Updates or views the server's global tax rate.
 
         Args:
-            interaction (discord.Interaction): _description_
-            percentage (int, optional): _description_. Defaults to None.
+            interaction (discord.Interaction): The interaction object.
+            percentage (int, optional): The tax percentage to set. Defaults to None.
         """
         guild_id = interaction.guild.id
         
@@ -117,8 +149,10 @@ class GlobalEconomyAdmin(shared.GroupedCog):
             guild_tax_rate = self.service.get_guild_tax(guild_id)
             embed = helpers.embed_generator(
                 title="Tax Rate",
-                description=f"Server's tax rate is `{guild_tax_rate}`"
+                description=f"Server's tax rate is `{guild_tax_rate * 100}%`"
             )
+            await interaction.response.send_message(embed=embed)
+            return
 
         if not (0 <= percentage <= 30):
             embed = helpers.embed_generator(
@@ -132,12 +166,14 @@ class GlobalEconomyAdmin(shared.GroupedCog):
         success = self.service.set_guild_tax(interaction.guild.id, decimal_rate)
         
         if success:
+            helpers.custom_print(level=shared.LogLevel.INFO, description=f"Tax updated to {percentage}% for guild {guild_id}.")
             embed = helpers.embed_generator(
                 title="Tax Rate Updated",
                 description=f"Guild tax is now set to **{percentage}%**.",
                 color=discord.Color.green()
             )
         else:
+            helpers.custom_print(level=shared.LogLevel.ERROR, description=f"Failed tax update for guild {guild_id}.")
             embed = helpers.embed_generator(
                 title="Tax Rate Error",
                 description="Failed to update guild's tax rate.",
@@ -147,17 +183,16 @@ class GlobalEconomyAdmin(shared.GroupedCog):
         await interaction.response.send_message(embed=embed)
 
 async def setup() -> None:
+    # Only register these if the config actually has them enabled
     if shared.GLOBAL_CONFIG["features"]["economy"]["global"]["is_enabled"]:
         await shared.SHIRAYUME.add_cog(GlobalEconomy(), override=True)
         await shared.SHIRAYUME.add_cog(GlobalEconomyAdmin(), override=True)
         helpers.custom_print(
             level=shared.LogLevel.DEBUG,
-            function_name="cogs.global_economy.setup",
-            description="Setup completed successfully"
+            description="Global economy cog setup completed successfully."
         )
     else:
         helpers.custom_print(
             level=shared.LogLevel.INFO,
-            function_name="cogs.global_economy.setup",
-            description="Global economy is disabled, setup skipped"
+            description="Global economy feature is disabled, setup skipped."
         )

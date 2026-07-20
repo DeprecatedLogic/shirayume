@@ -4,8 +4,11 @@ import asyncio
 from utils import shared
 from io import BytesIO
 from colorthief import ColorThief
+import inspect
+from database import database_manager
 
 DEFAULT_COLOR = (255, 255, 255)
+
 
 def embed_generator(title: str, description:str, color: tuple[int, int, int] | discord.Color = None) -> discord.Embed:
     """
@@ -50,13 +53,12 @@ def remove_characters(string: str, chars_to_remove: str) -> str:
     # Use translate to remove specified characters and return the string
     return string.translate(translation_table)
 
-def custom_print(level: shared.LogLevel, function_name: str, description: str):
+def custom_print(level: shared.LogLevel, description: str):
     """
     _summary_
 
     Args:
         level (shared.LogLevel): _description_
-        function_name (str): _description_
         description (str): _description_
     """
     terminal = shared.GLOBAL_TERMINAL
@@ -68,13 +70,32 @@ def custom_print(level: shared.LogLevel, function_name: str, description: str):
     r, g, b = level.color_rgb
     description_color = terminal.color_rgb(r, g, b)
 
+    # Get caller information
+    frame = inspect.currentframe()
+    while frame:
+        frame = frame.f_back
+        if frame and frame.f_globals.get("__name__") != __name__:
+            break
+
+    module = inspect.getmodule(frame)
+    module_name = module.__name__ if module else "<unknown>"
+
+    function_name = frame.f_code.co_name
+
+    # Get class name if called from a method
+    class_name = ""
+    if "self" in frame.f_locals:
+        class_name = f"{frame.f_locals['self'].__class__.__name__}."
+
+    function_path = f"{module_name}.{class_name}{function_name}"
+
     print(
         f"{description_color}{level}{' ' * (shared.LogLevel.max_length() - len(level.name))}",
         f"{datetime_fg}{datetime.strftime(datetime.now(), '[%Y-%m-%d %H:%M:%S]')}",
-        f"{function_fg}[{function_name}]",
+        f"{function_fg}[{function_path}]",
         f"{description_color}{description}",
         default_fg,
-        flush = True
+        flush=True
     )
 
 async def update_default_color():
@@ -87,6 +108,5 @@ async def update_default_color():
     DEFAULT_COLOR = ColorThief(BytesIO(avatar_bytes)).get_color(quality=1)
     custom_print(
         level=shared.LogLevel.INFO,
-        function_name="helpers.setup_bot",
         description=f"Shirayume's default color set to: {DEFAULT_COLOR}"
     )
