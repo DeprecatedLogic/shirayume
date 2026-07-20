@@ -797,9 +797,12 @@ class Poll():
         "_poll_id",
         "_guild_id",
         "_creator_id",
+        "_message_id",
+        "_channel_id",
         "_question",
         "_votes",
         "_is_active",
+        "_is_anonymous",
         "_created_at",
         "_updated_at",
         "_ends_at",
@@ -811,9 +814,12 @@ class Poll():
         poll_id: int,
         guild_id: int,
         creator_id: int,
+        message_id: int,
+        channel_id: int,
         question: str,
         votes: Dict[str, List[int]],
         is_active: bool,
+        is_anonymous: bool,
         created_at: datetime,
         updated_at: datetime,
         ends_at: datetime,
@@ -823,9 +829,12 @@ class Poll():
         self.poll_id = poll_id
         self.guild_id = guild_id
         self.creator_id = creator_id
+        self.message_id = message_id
+        self.channel_id = channel_id
         self.question = question
         self.votes = votes
         self.is_active = is_active
+        self.is_anonymous = is_anonymous
         self.created_at = created_at
         self.updated_at = updated_at
         self.is_dirty = is_dirty
@@ -843,9 +852,12 @@ class Poll():
                 poll_id = data["poll_id"],
                 guild_id = data["guild_id"],
                 creator_id = data["creator_id"],
+                message_id = data.get("message_id", -1),
+                channel_id = data.get("channel_id", -1),
                 question = data["question"],
                 votes = parsed_votes,
                 is_active = bool(data["is_active"]),
+                is_anonymous = bool(data["is_anonymous"]),
                 created_at = data["created_at"],
                 updated_at = data.get("updated_at", data["created_at"]),
                 ends_at = data.get("ends_at", data["created_at"]),
@@ -858,9 +870,12 @@ class Poll():
             "poll_id": self.poll_id,
             "guild_id": self.guild_id,
             "creator_id": self.creator_id,
+            "message_id": self.message_id,
+            "channel_id": self.channel_id,
             "question": self.question,
             "votes": self.votes,
             "is_active": self.is_active,
+            "is_anonymous": self.is_anonymous,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
             "is_dirty": self.is_dirty,
@@ -897,6 +912,22 @@ class Poll():
         else: raise TypeError("Incorrect type for creator_id")
 
     @property
+    def message_id(self): return self._message_id
+
+    @message_id.setter
+    def message_id(self, value: int):
+        if type(value) == int: self._message_id = value
+        else: raise TypeError("Incorrect type for message_id")
+
+    @property
+    def channel_id(self): return self._channel_id
+
+    @channel_id.setter
+    def channel_id(self, value: int):
+        if type(value) == int: self._channel_id = value
+        else: raise TypeError("Incorrect type for channel_id")
+
+    @property
     def question(self): return self._question
 
     @question.setter
@@ -920,6 +951,14 @@ class Poll():
         if type(value) == bool: self._is_active = value
         else: raise TypeError("Incorrect type for is_active")
     
+    @property
+    def is_anonymous(self): return self._is_anonymous
+
+    @is_anonymous.setter
+    def is_anonymous(self, value: bool):
+        if type(value) == bool: self._is_anonymous = value
+        else: raise TypeError("Incorrect type for is_anonymous")
+
     @property
     def created_at(self): return self._created_at
 

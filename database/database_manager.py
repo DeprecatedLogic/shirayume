@@ -1,11 +1,13 @@
 import mysql.connector
 import json
-from typing import Union, List, Dict, Any, Set
+from typing import Union, List, Dict, Any, Set, Optional
 from database import models
 from datetime import datetime
 from utils import shared, helpers
+import asyncio
 
-DB_MANAGER = None 
+# Initialized in launch.py
+DB_MANAGER: "DatabaseManager" = None # Global DatabaseManager instance to be used by services
 
 # Dynamic mapping linking Table enums directly to their model classes
 TABLE_MAP = {
@@ -27,7 +29,7 @@ PRIMARY_KEYS = {
     shared.Table.moderation_logs: ["mlog_id"],
     shared.Table.polls: ["poll_id"],
     shared.Table.user_economies: ["guild_id", "user_id"],
-    shared.Table.shop_items: ["item_id"],
+    shared.Table.shop_items: ["item_id", "guild_id"],
     shared.Table.global_shop_items: ["item_id"],
 }
 
@@ -40,6 +42,12 @@ AUTO_INCREMENT_FIELDS = {
 }
 
 class DatabaseManager:
+    """
+    Manages the in-memory cache layer and handles synchronization with the underlying MySQL database.
+    
+    Provides an interface for tracking modifications (dirty states), executing transactional 
+    bulk updates/deletions, managing dynamic schemas, and keeping application state synced.
+    """
 
     def __init__(self, DB_HOST: str, DB_USER: str, DB_PASSWORD: str, DATABASE: str) -> None:
         """
@@ -50,7 +58,13 @@ class DatabaseManager:
             DB_USER (str): Database username.
             DB_PASSWORD (str): Database password.
             DATABASE (str): Name of the database.
+            
+        Raises:
+            mysql.connector.Error: If the database connection fails to establish.
         """
+        self.name = DATABASE
+
+        # Active local storage caches for individual tables
         self.users = []
         self.guilds = []
         self.user_guild_settings = []
@@ -60,28 +74,25 @@ class DatabaseManager:
         self.shop_items = []
         self.global_shop_items = []
 
-        # O(1) lookup indices
+        # O(1) lookup indices mapping table identifiers to primary key values
         self._index = {
             table: {}
             for table in TABLE_MAP
         }
 
-        # Dirty tracking
+        # Track items modified or marked for deletion since the last sync
         self._dirty = {
-            table:set()
+            table: set()
             for table in TABLE_MAP
         }
 
-        # Schema cache
+        # Caches for dynamic SQL schema execution metadata
         self._schema_cache = {}
-
-        # SQL cache
         self._sql_cache = {}
-
-        # Last IDs cache
-        self._last_id_cache = {}
+        self._last_id_cache: Dict[shared.Table, Union[int, Dict[int, int]]] = {}
 
         try:
+            # Initialize direct connection with pure Python implementation enabled
             self.db_connection = mysql.connector.connect(
                 host=DB_HOST,
                 user=DB_USER,
@@ -90,55 +101,72 @@ class DatabaseManager:
                 use_pure=True
             )
 
+            # Dictionary cursor ensures fetched rows match key-value mappings
             self.db_shirayume = self.db_connection.cursor(
                 dictionary=True
             )
 
+            # Build cached templates and metadata mapping table constraints
             self._initialize_schema()
 
         except mysql.connector.Error as e:
-
             helpers.custom_print(
                 level=shared.LogLevel.CRITICAL,
-                function_name="database.DatabaseManager.__init__",
                 description=f"Failed to connect: {e}"
             )
-
             raise
 
-    def _key(self, table, obj):
+        self.loop_task: asyncio.Task = asyncio.create_task(self._auto_commit_loop())
+
+    async def _auto_commit_loop(self) -> None:
         """
-        _summary_
+        Periodically flushes tracking changes.
+        """
+        try:
+            while True:
+                await asyncio.sleep(300) # 5 minutes
+                await self.database_commit()
+                helpers.custom_print(
+                    level=shared.LogLevel.DEBUG,
+                    description=f"Flushed tracking changes to the {self.name} database."
+                )
+        except asyncio.CancelledError:
+            raise
+        except mysql.connector.Error as e:
+            helpers.custom_print(
+                level=shared.LogLevel.ERROR,
+                description=f"Auto-commit failed: {e}"
+            )
+
+    def _key(self, table: shared.Table, obj: Any) -> Union[Any, tuple]:
+        """
+        Extracts the unique cache dictionary key based on defined table primary keys.
 
         Args:
-            table (_type_): _description_
-            obj (_type_): _description_
+            table (shared.Table): The target table enum specification.
+            obj (Any): The data model instance containing field values.
 
         Returns:
-            _type_: _description_
+            Union[Any, tuple]: A singular primary key value, or a composite tuple of primary keys.
         """
         pkeys = PRIMARY_KEYS[table]
 
+        # Extract singular value for standard primary keys to avoid unnecessary tuple wrapping
         if len(pkeys) == 1:
             return getattr(obj, pkeys[0])
 
-        return tuple(getattr(obj,pk) for pk in pkeys)
+        # Evaluate and construct key representing composite key requirements
+        return tuple(getattr(obj, pk) for pk in pkeys)
 
-    def mark_dirty(self, table, obj) -> None:
-        """
-        _summary_
-
-        Args:
-            table (_type_): _description_
-            obj (_type_): _description_
-        """
-        obj.is_dirty = True
-        self._dirty[table].add(obj)
-
-    def _add(self, table, items, set_dirty: bool = True) -> None:
+    def _add(self, table: shared.Table, items: Union[List[Any], Any], set_dirty: bool = True) -> None:
         """
         Adds item(s) to the in-memory cache, replacing existing items 
         with the same primary key if they exist.
+
+        Args:
+            table (shared.Table): The targeted entity table destination.
+            items (Union[List[Any], Any]): A single data model or a list of data models.
+            set_dirty (bool): Whether to instantly mark incoming items as pending DB write modifications.
         """
         if not isinstance(items, list):
             items = [items]
@@ -152,14 +180,14 @@ class DatabaseManager:
             if key in index:
                 old_item = index[key]
                 
-                # If same memory reference (un-delete / update if needed)
+                # Check for identical reference; reset flags and handle potential dirty updates
                 if old_item is item:
                     old_item.is_deleted = False
                     if set_dirty:
                         self.mark_dirty(table, old_item)
                     continue
 
-                # If new object reference replacing an old one
+                # Remove legacy reference object from clean linear storage tracks
                 if old_item in storage:
                     storage.remove(old_item)
                 
@@ -167,7 +195,7 @@ class DatabaseManager:
                 # (the new object will overwrite it in the DB on commit)
                 self._dirty[table].discard(old_item)
 
-            # Insert the new item into active storage and the index
+            # Insert the new item into active storage and the lookup index
             item.is_deleted = False
             storage.append(item)
             index[key] = item
@@ -175,12 +203,13 @@ class DatabaseManager:
             if set_dirty:
                 self.mark_dirty(table, item)
 
-    def _remove(self, table, key) -> None:
-        """_summary_
+    def _remove(self, table: shared.Table, key: Any) -> None:
+        """
+        Marks an item matched by key for lazy physical deletion during the next transactional flush.
 
         Args:
-            table (_type_): _description_
-            key (_type_): _description_
+            table (shared.Table): The target table identifier.
+            key (Any): The lookup reference key or lookup tuple.
         """
         obj = self._index[table].get(key)
 
@@ -189,42 +218,42 @@ class DatabaseManager:
             self.mark_dirty(table, obj)
 
     def _initialize_schema(self) -> None:
-        """ _summary_ """
+        """
+        Inspects live database structure via DESCRIBE statements to dynamically populate SQL structural caches.
+        """
         for table in TABLE_MAP:
-
             table_name = table.name
             self.db_shirayume.execute(f"DESCRIBE {table_name}")
             
             rows = self.db_shirayume.fetchall()
             columns = [r["Field"] for r in rows]
 
+            # Filter non-nullable constraints lacking defaults or database auto-increment definitions
             required = [
                 r["Field"]
                 for r in rows
                 if (
-                    r["Null"]=="NO"
+                    r["Null"] == "NO"
                     and r["Default"] is None
-                    and "auto_increment"
-                    not in r["Extra"]
+                    and "auto_increment" not in r["Extra"]
                 )
             ]
 
-            self._schema_cache[table_name]={
-                "columns":columns,
-                "required":required
+            self._schema_cache[table_name] = {
+                "columns": columns,
+                "required": required
             }
 
             helpers.custom_print(
                 level=shared.LogLevel.DEBUG,
-                function_name="database.database_manager.DatabaseManager._initialize_schema",
-                description=f"Required fields for table {table_name}: {'/'.join(required)}"
+                description=f"Required fields for table {table_name}: {' '.join(required)}"
             )
 
             pkeys = PRIMARY_KEYS[table]
-
-            placeholders = ", ".join(["%s"]*len(columns))
+            placeholders = ", ".join(["%s"] * len(columns))
             col_str = ", ".join(columns)
 
+            # Build query segments modifying fields except those contributing to key identifiers
             update_str = ", ".join(
                 f"{c}=VALUES({c})"
                 for c in columns
@@ -233,32 +262,50 @@ class DatabaseManager:
 
             delete_where = " AND ".join(f"{pk}=%s" for pk in pkeys)
 
-            self._sql_cache[table_name]={
-                "delete":
-                f"""
-                DELETE FROM {table_name}
-                WHERE {delete_where}
+            # Build and cache atomic operation templates
+            self._sql_cache[table_name] = {
+                "delete": f"""
+                    DELETE FROM {table_name}
+                    WHERE {delete_where}
                 """,
-
-                "upsert":
-                f"""
-                INSERT INTO {table_name}
-                ({col_str})
-
-                VALUES ({placeholders})
-
-                ON DUPLICATE KEY UPDATE
-                {update_str}
+                "upsert": f"""
+                    INSERT INTO {table_name} ({col_str})
+                    VALUES ({placeholders})
+                    ON DUPLICATE KEY UPDATE {update_str}
                 """
             }
 
 
-    def get_next_id(self, table: shared.Table) -> int:
+    def mark_dirty(self, table: shared.Table, obj: Any) -> None:
+        """
+        Flags a modified model instance as dirty to queue it for the next commit sequence.
+
+        Args:
+            table (shared.Table): The associated table representation.
+            obj (Any): The modified model instance.
+        """
+        obj.is_dirty = True
+        self._dirty[table].add(obj)
+
+    def get_next_id(self, table: shared.Table, guild_id: Optional[int] = None) -> int:
         """
         Gets and increments the next available ID for an auto-increment table.
+
+        Args:
+            table (shared.Table): Target enum table requiring validation.
+
+        Returns:
+            int: The unique auto-increment sequence identification integer.
         """
-        if table not in self._last_id_cache:
-            self._last_id_cache[table] = 0
+        if table == shared.Table.shop_items:
+            if guild_id is None:
+                raise ValueError("guild_id is required for shop_items")
+
+            cache = self._last_id_cache.setdefault(table, {})
+            cache[guild_id] = cache.get(guild_id, 0) + 1
+            return cache[guild_id]
+
+        self._last_id_cache.setdefault(table, 0)
         self._last_id_cache[table] += 1
         return self._last_id_cache[table]
 
@@ -473,24 +520,22 @@ class DatabaseManager:
 
     def add_global_shop_items(self, items: Union[List[models.GlobalShopItem], models.GlobalShopItem]) -> None:
         """
-        _summary_
+        Adds global shop item configurations to cache storage.
 
         Args:
-            items (Union[List[models.GlobalShopItem], models.GlobalShopItem]): _description_
+            items (Union[List[models.GlobalShopItem], models.GlobalShopItem]): Single config model or container list.
         """
         self._add(shared.Table.global_shop_items, items)
 
     def remove_global_shop_items(self, item_ids: Union[List[int], int]) -> None:
         """
-        _summary_
+        Marks designated global item options as deleted.
 
         Args:
-            item_ids (Union[List[int], int]): _description_
-
-        Returns:
-            _type_: _description_
+            item_ids (Union[List[int], int]): Target unique identifier or list of IDs.
         """
-        if isinstance(item_ids, int): item_ids = [item_ids]
+        if isinstance(item_ids, int): 
+            item_ids = [item_ids]
         for item_id in item_ids:
             self._remove(shared.Table.global_shop_items, item_id)
 
@@ -513,20 +558,19 @@ class DatabaseManager:
                 
                 required_fields = self._schema_cache[table_name]["required"]
                 
+                # Confirm presence of structural keys required before construction
                 if all(field in kwargs for field in required_fields):
                     return model_class.from_dict(kwargs)
                     
             helpers.custom_print(
-                level = shared.LogLevel.ERROR,
-                function_name = "database.DatabaseManager.initialize_database_model",
-                description = f"Missing required fields for {table.name}"
+                level=shared.LogLevel.ERROR,
+                description=f"Missing required fields for {table.name}"
             )
 
         except Exception as e:
             helpers.custom_print(
-                level = shared.LogLevel.ERROR,
-                function_name = "database.DatabaseManager.initialize_database_model",
-                description = f"Error creating model for {table.name}: {e}"
+                level=shared.LogLevel.ERROR,
+                description=f"Error creating model for {table.name}: {e}"
             )
         
         return None
@@ -542,9 +586,12 @@ class DatabaseManager:
 
             self._dirty[table].clear()
 
-    async def database_commit(self)->None:
+    async def database_commit(self) -> None:
         """
         Efficiently executes all pending dirty state changes into the database.
+        
+        Raises:
+            mysql.connector.Error: If transactional query compilation or staging fails.
         """
         try:
             pending_cleanup = []
@@ -555,16 +602,17 @@ class DatabaseManager:
                 if not dirty_items:
                     continue
 
-                delete_items=[]
-                upsert_items=[]
+                delete_items = []
+                upsert_items = []
                 
+                # Separate targets according to marked operation intention
                 for item in dirty_items:
-
                     if item.is_deleted:
                         delete_items.append(item)
                     else:
                         upsert_items.append(item)
 
+                # Process deletes as an optimized single batch query
                 if delete_items:
                     delete_data = [
                         tuple(getattr(item, pk) for pk in PRIMARY_KEYS[table])
@@ -576,12 +624,13 @@ class DatabaseManager:
                         delete_data
                     )
                 
-                    # Remember for later cleanup
+                    # Track successful targets for in-memory reduction post-commit
                     pending_cleanup.extend(
                         (table, obj)
                         for obj in delete_items
                     )
 
+                # Process insertions or conditional upgrades as a single batch query
                 if upsert_items:
                     columns = self._schema_cache[table.name]["columns"]
                     data = []
@@ -592,8 +641,10 @@ class DatabaseManager:
                         for col in columns:
                             val = getattr(item, col)
 
+                            # Normalize specific enums to string values
                             if isinstance(val, (shared.Action, shared.GlobalItemType)):
                                 val = val.name
+                            # Ensure serialization of structurally nested configurations
                             elif isinstance(val, (list, dict)):
                                 val = json.dumps(val)
 
@@ -606,6 +657,7 @@ class DatabaseManager:
                         data
                     )
                     
+            # Complete transaction updates down to persistent storage safely
             self.db_connection.commit()
 
             # Execute after commit succeeded
@@ -626,6 +678,7 @@ class DatabaseManager:
                 # Keep objects that are still in the index (not deleted)
                 setattr(self, table_name, [x for x in current_list if self._key(table, x) in self._index[table]])
 
+            # Unmark dirty flags across items cleared during sequence execution
             for table in TABLE_MAP:
                 for obj in self._dirty[table]:
                     obj.is_dirty = False
@@ -639,16 +692,26 @@ class DatabaseManager:
     async def database_close(self) -> None:
         """
         Commits pending changes and gracefully closes the database connection.
+        
+        Raises:
+            mysql.connector.Error: If execution synchronization or resource freeing breaks down.
         """
         try:
-            await self.database_commit()  
+            # TODO: Wait for active commands to end (not things like polls, but games and similar stuff if any)
+            self.loop_task.cancel()
+            try:
+                await self.loop_task
+            except asyncio.CancelledError:
+                pass
+            await self.database_commit()
+            
             self.db_shirayume.close()
             self.db_connection.close()
+            DB_MANAGER = None
         except mysql.connector.Error as e:
             helpers.custom_print(
-                level = shared.LogLevel.CRITICAL,
-                function_name = "database.DatabaseManager.database_close",
-                description = f"Failed to close database connection: {e}"
+                level=shared.LogLevel.CRITICAL,
+                description=f"Failed to close database connection: {e}"
             )
             raise
 
@@ -661,26 +724,37 @@ def setup(DB_HOST: str, DB_USER: str, DB_PASSWORD: str, DATABASE: str) -> None:
         DB_USER (str): Db user.
         DB_PASSWORD (str): Db password.
         DATABASE (str): Target database.
+        
+    Raises:
+        Exception: If global DB_MANAGER fails initialization steps.
+        mysql.connector.Error: If historical bulk selection queries experience connectivity loss.
     """
     helpers.custom_print(
-        level = shared.LogLevel.INFO,
-        function_name = "database.DatabaseManager.setup",
-        description = f"Starting DB setup..."
+        level=shared.LogLevel.INFO,
+        description="Starting DB setup..."
     )
+
     global DB_MANAGER
     DB_MANAGER = DatabaseManager(DB_HOST, DB_USER, DB_PASSWORD, DATABASE)
+
+    if DB_MANAGER is None:
+        helpers.custom_print(
+            level=shared.LogLevel.DEBUG,
+            description="Failed to initialize DB_MANAGER"
+        )
+        raise Exception("Failed to create a DatabaseManager instance")
+
     helpers.custom_print(
-        level = shared.LogLevel.DEBUG,
-        function_name = "database.DatabaseManager.setup",
-        description = f"DB_MANAGER initialized ({DB_MANAGER})"
+        level=shared.LogLevel.DEBUG,
+        description="DB_MANAGER initialized successfully"
     )
+
     try:
         for table in TABLE_MAP:
             table_name = table.name
             helpers.custom_print(
-                level = shared.LogLevel.DEBUG,
-                function_name = "database.DatabaseManager.setup",
-                description = f"Importing {table_name} from DB..."
+                level=shared.LogLevel.DEBUG,
+                description=f"Importing {table_name} from DB..."
             )
             
             DB_MANAGER.db_shirayume.execute(f"SELECT * FROM {table_name}")
@@ -692,30 +766,42 @@ def setup(DB_HOST: str, DB_USER: str, DB_PASSWORD: str, DATABASE: str) -> None:
                 if model:
                     models_list.append(model)
             
+            # Map elements into local application indexing without marking state dirty
             DB_MANAGER._add(table, models_list, set_dirty=False)
             
             # Determine and cache the maximum ID for tables designated for auto-incrementing
             if table in AUTO_INCREMENT_FIELDS:
-                auto_inc_col = AUTO_INCREMENT_FIELDS[table]
-                max_id = max((getattr(model, auto_inc_col) for model in models_list), default=0)
-                DB_MANAGER._last_id_cache[table] = max_id
+                if table == shared.Table.shop_items:
+                    guild_max = {}
+
+                    for model in models_list:
+                        guild_max[model.guild_id] = max(
+                            guild_max.get(model.guild_id, 0),
+                            model.item_id
+                        )
+
+                    DB_MANAGER._last_id_cache[table] = guild_max
+                else:
+                    auto_inc_col = AUTO_INCREMENT_FIELDS[table]
+                    max_id = max(
+                        (getattr(model, auto_inc_col) for model in models_list),
+                        default=0
+                    )
+                    DB_MANAGER._last_id_cache[table] = max_id
 
             helpers.custom_print(
-                level = shared.LogLevel.DEBUG,
-                function_name = "database.DatabaseManager.setup",
-                description = f"DB {table_name} imported"
+                level=shared.LogLevel.DEBUG,
+                description=f"DB {table_name} imported"
             )
 
         helpers.custom_print(
-            level = shared.LogLevel.INFO,
-            function_name = "database.DatabaseManager.setup",
-            description = f"Database setup finished"
+            level=shared.LogLevel.INFO,
+            description="Database setup finished"
         )
 
     except mysql.connector.Error as e:
         helpers.custom_print(
-            level = shared.LogLevel.CRITICAL,
-            function_name = "database.DatabaseManager.setup",
-            description = f"Failed to load data from database: {e}"
+            level=shared.LogLevel.CRITICAL,
+            description=f"Failed to load data from database: {e}"
         )
         raise

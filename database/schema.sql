@@ -102,9 +102,12 @@ CREATE TABLE polls (
     poll_id BIGINT PRIMARY KEY,
     guild_id BIGINT NOT NULL,
     creator_id BIGINT NOT NULL,
+    message_id BIGINT NOT NULL,
+    channel_id BIGINT NOT NULL,
     question VARCHAR(255) NOT NULL,
     votes JSON NOT NULL,
     is_active BOOLEAN DEFAULT TRUE NOT NULL,
+    is_anonymous BOOLEAN DEFAULT TRUE NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP() NOT NULL,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP()
         ON UPDATE CURRENT_TIMESTAMP()
