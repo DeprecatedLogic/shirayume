@@ -64,8 +64,9 @@ class User():
                 is_deleted = bool(data.get("is_deleted", False))
             )
 
-    def compare(self, model: "User") -> bool:
-        return type(model) == User and self.user_id == model.user_id
+    @staticmethod
+    def primary_keys() -> tuple[str]:
+        return ("user_id",)
 
     @property
     def user_id(self): return self._user_id
@@ -262,8 +263,9 @@ class Guild():
                 is_deleted = bool(data.get("is_deleted", False)),
             )
 
-    def compare(self, model: "Guild") -> bool:
-        return type(model) == Guild and self.guild_id == model.guild_id
+    @staticmethod
+    def primary_keys() -> tuple[str]:
+        return ("guild_id",)
 
     @property
     def guild_id(self): return self._guild_id
@@ -510,8 +512,9 @@ class UserGuildSettings():
                 is_deleted = bool(data.get("is_deleted", False))
             )
 
-    def compare(self, model: "UserGuildSettings") -> bool:
-        return type(model) == UserGuildSettings and self.user_id == model.user_id and self.guild_id == model.guild_id
+    @staticmethod
+    def primary_keys() -> tuple[str]:
+        return ("user_id", "guild_id")
 
     @property
     def user_id(self): return self._user_id
@@ -689,8 +692,9 @@ class ModerationLog():
                 is_deleted = bool(data.get("is_deleted", False))
             )
 
-    def compare(self, model: "ModerationLog") -> bool:
-        return type(model) == ModerationLog and self.mlog_id == model.mlog_id
+    @staticmethod
+    def primary_keys() -> tuple[str]:
+        return ("mlog_id",)
 
     @property
     def mlog_id(self): return self._mlog_id
@@ -882,8 +886,9 @@ class Poll():
             "is_deleted": self.is_deleted
         }
 
-    def compare(self, model: "Poll") -> bool:
-        return type(model) == Poll and self.poll_id == model.poll_id
+    @staticmethod
+    def primary_keys() -> tuple[str]:
+        return ("poll_id",)
 
     @property
     def poll_id(self): return self._poll_id
@@ -1039,8 +1044,9 @@ class UserEconomy():
                 is_deleted = bool(data.get("is_deleted", False))
             )
 
-    def compare(self, model: "UserEconomy") -> bool:
-        return type(model) == UserEconomy and self.guild_id == model.guild_id and self.user_id == model.user_id
+    @staticmethod
+    def primary_keys() -> tuple[str]:
+        return ("guild_id", "user_id")
 
     @property
     def guild_id(self): return self._guild_id
@@ -1138,8 +1144,9 @@ class ShopItem():
                 is_deleted = bool(data.get("is_deleted", False))
             )
 
-    def compare(self, model: "ShopItem") -> bool:
-        return type(model) == ShopItem and self.item_id == model.item_id
+    @staticmethod
+    def primary_keys() -> tuple[str]:
+        return ("item_id", "guild_id")
 
     @property
     def item_id(self): return self._item_id
@@ -1260,8 +1267,9 @@ class GlobalShopItem():
                 is_deleted = bool(data.get("is_deleted", False))
             )
 
-    def compare(self, model: "GlobalShopItem") -> bool:
-        return type(model) == GlobalShopItem and self.item_id == model.item_id
+    @staticmethod
+    def primary_keys() -> tuple[str]:
+        return ("item_id",)
 
     @property
     def item_id(self): return self._item_id
@@ -1310,6 +1318,171 @@ class GlobalShopItem():
     def metadata(self, value: dict):
         if type(value) == dict: self._metadata = value
         else: raise TypeError("Incorrect type for metadata")
+
+    @property
+    def is_dirty(self): return self._is_dirty
+
+    @is_dirty.setter
+    def is_dirty(self, value: bool):
+        if type(value) == bool: self._is_dirty = value
+        else: raise TypeError("Incorrect type for is_dirty")
+
+    @property
+    def is_deleted(self): return self._is_deleted
+
+    @is_deleted.setter
+    def is_deleted(self, value: bool):
+        if type(value) == bool: self._is_deleted = value
+        else: raise TypeError("Incorrect type for is_deleted")
+
+class MatchResult():
+    instance_counter = 0
+
+    __slots__ = (
+        "_match_id",
+        "_guild1_id",
+        "_guild1_users",
+        "_guild2_id",
+        "_guild2_users",
+        "_game_type",
+        "_winner_guild_id",
+        "_credits_bet",
+        "_started_at",
+        "_ended_at",
+        "_is_dirty",
+        "_is_deleted"
+    )
+
+    def __init__(self,
+        match_id: int,
+        guild1_id: int,
+        guild1_users: list[int],
+        guild2_id: int,
+        guild2_users: list[int],
+        game_type: str,
+        winner_guild_id: int,
+        credits_bet: int,
+        started_at: datetime,
+        ended_at: datetime,
+        is_dirty: bool,
+        is_deleted: bool
+    ) -> None:
+        self.match_id = match_id
+        self.guild1_id = guild1_id
+        self.guild1_users = guild1_users
+        self.guild2_id = guild2_id
+        self.guild2_users = guild2_users
+        self.game_type = game_type
+        self.winner_guild_id = winner_guild_id
+        self.credits_bet = credits_bet
+        self.started_at = started_at
+        self.ended_at = ended_at
+        self.is_dirty = is_dirty
+        self.is_deleted = is_deleted
+        
+        MatchResult.instance_counter += 1
+
+    @classmethod
+    def from_dict(cls, data: dict):
+        if type(data) is dict:
+            return cls(
+                match_id = data["match_id"],
+                guild1_id =  data["guild1_id"],
+                guild1_users = data["guild1_users"],
+                guild2_id =  data["guild2_id"],
+                guild2_users = data["guild2_users"],
+                game_type = data["game_type"],
+                winner_guild_id =  data["winner_guild_id"],
+                credits_bet = data["credits_bet"],
+                started_at = data["started_at"],
+                ended_at = data.get("ended_at", data["started_at"]),
+                is_dirty = bool(data.get("is_dirty", False)),
+                is_deleted = bool(data.get("is_deleted", False))
+            )
+
+    @staticmethod
+    def primary_keys() -> tuple[str]:
+        return ("match_id",)
+
+    @property
+    def match_id(self): return self._match_id
+
+    @match_id.setter
+    def match_id(self, value: int):
+        if type(value) == int: self._match_id = value
+        else: raise TypeError("Incorrect type for match_id")
+    
+    @property
+    def guild1_id(self): return self._guild1_id
+
+    @guild1_id.setter
+    def guild1_id(self, value: int):
+        if type(value) == int: self._guild1_id = value
+        else: raise TypeError("Incorrect type for guild1_id")
+    
+    @property
+    def guild1_users(self): return self._guild1_users
+
+    @guild1_users.setter
+    def guild1_users(self, value: list):
+        if type(value) == list: self._guild1_users = value
+        else: raise TypeError("Incorrect type for guild1_users")
+    
+    @property
+    def guild2_id(self): return self._guild2_id
+
+    @guild2_id.setter
+    def guild2_id(self, value: int):
+        if type(value) == int: self._guild2_id = value
+        else: raise TypeError("Incorrect type for guild2_id")
+    
+    @property
+    def guild2_users(self): return self._guild2_users
+
+    @guild2_users.setter
+    def guild2_users(self, value: list):
+        if type(value) == list: self._guild2_users = value
+        else: raise TypeError("Incorrect type for guild2_users")
+    
+    @property
+    def game_type(self): return self._game_type
+
+    @game_type.setter
+    def game_type(self, value: str):
+        if type(value) == str: self._game_type = value
+        else: raise TypeError("Incorrect type for game_type")
+    
+    @property
+    def winner_guild_id(self): return self._winner_guild_id
+
+    @winner_guild_id.setter
+    def winner_guild_id(self, value: int):
+        if type(value) == int: self._winner_guild_id = value
+        else: raise TypeError("Incorrect type for winner_guild_id")
+
+    @property
+    def credits_bet(self): return self._credits_bet
+
+    @credits_bet.setter
+    def credits_bet(self, value: int):
+        if type(value) == int: self._credits_bet = value
+        else: raise TypeError("Incorrect type for credits_bet")
+    
+    @property
+    def started_at(self): return self._started_at
+
+    @started_at.setter
+    def started_at(self, value: datetime):
+        if type(value) == datetime: self._started_at = value
+        else: raise TypeError("Incorrect type for started_at")
+
+    @property
+    def ended_at(self): return self._ended_at
+
+    @ended_at.setter
+    def ended_at(self, value: datetime):
+        if type(value) == datetime: self._ended_at = value
+        else: raise TypeError("Incorrect type for ended_at")
 
     @property
     def is_dirty(self): return self._is_dirty

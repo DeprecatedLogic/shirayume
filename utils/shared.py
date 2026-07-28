@@ -67,6 +67,7 @@ class Table(Enum):
     user_economies = auto()
     shop_items = auto()
     global_shop_items = auto()
+    match_results = auto()
 
 class GlobalItemType(Enum):
     title = auto()
@@ -112,11 +113,6 @@ class Rank(Enum):
     def __str__(self):
         return self.name.split('_', maxsplit = 1)[1]
 
-class SupportedWebsites(Enum):
-    """ Defines supported websites for scraping. """
-    my_anime_list = "MyAnimeList"
-    brainy_quote = "BrainyQuote"
-
-    def __str__(self):
-        return self.value
-    
+class RenderMode(Enum):
+    ASCII = auto()
+    IMAGE = auto()

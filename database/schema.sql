@@ -116,7 +116,8 @@ CREATE TABLE polls (
     CONSTRAINT fk_polls_guildid_guilds_guildid
         FOREIGN KEY (guild_id) REFERENCES guilds(guild_id),
     CONSTRAINT fk_polls_creatorid_users_userid
-        FOREIGN KEY (creator_id) REFERENCES users(user_id)
+        FOREIGN KEY (creator_id) REFERENCES users(user_id),
+    CHECK (ends_at IS NULL OR ends_at >= created_at)
 );
 
 CREATE TABLE user_economies (
@@ -149,4 +150,26 @@ CREATE TABLE global_shop_items (
     price INT DEFAULT 0 NOT NULL,
     item_type VARCHAR(32) NOT NULL,
     metadata JSON NOT NULL
+);
+
+CREATE TABLE match_results (
+    match_id BIGINT PRIMARY KEY,
+    guild1_id BIGINT NOT NULL,
+    guild1_users JSON  NOT NULL,
+    guild2_id BIGINT NOT NULL,
+    guild2_users JSON  NOT NULL,
+    game_type VARCHAR(255) NOT NULL,
+    winner_guild_id BIGINT NOT NULL,
+    credits_bet BIGINT NOT NULL,
+    started_at DATETIME NOT NULL,
+    ended_at DATETIME NOT NULL,
+    CONSTRAINT fk_match_results_guild1id_guilds_guildid
+        FOREIGN KEY (guild1_id) REFERENCES guilds(guild_id),
+    CONSTRAINT fk_match_results_guild2id_guilds_guildid
+        FOREIGN KEY (guild2_id) REFERENCES guilds(guild_id),
+    CONSTRAINT fk_match_results_winnerguildid_guilds_guildid
+        FOREIGN KEY (winner_guild_id) REFERENCES guilds(guild_id),
+    CHECK (winner_guild_id IN (guild1_id, guild2_id)),
+    CHECK (guild1_id <> guild2_id),
+    CHECK (ended_at >= started_at)
 );

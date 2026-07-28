@@ -19,18 +19,20 @@ TABLE_MAP = {
     shared.Table.user_economies: models.UserEconomy,
     shared.Table.shop_items: models.ShopItem,
     shared.Table.global_shop_items: models.GlobalShopItem,
+    shared.Table.match_results: models.MatchResult
 }
 
 # Explicit definition of primary keys to correctly handle deletions and upsert updates
 PRIMARY_KEYS = {
-    shared.Table.users: ["user_id"],
-    shared.Table.guilds: ["guild_id"],
-    shared.Table.user_guild_settings: ["user_id", "guild_id"],
-    shared.Table.moderation_logs: ["mlog_id"],
-    shared.Table.polls: ["poll_id"],
-    shared.Table.user_economies: ["guild_id", "user_id"],
-    shared.Table.shop_items: ["item_id", "guild_id"],
-    shared.Table.global_shop_items: ["item_id"],
+    shared.Table.users: models.User.primary_keys(),
+    shared.Table.guilds: models.Guild.primary_keys(),
+    shared.Table.user_guild_settings: models.UserGuildSettings.primary_keys(),
+    shared.Table.moderation_logs: models.ModerationLog.primary_keys(),
+    shared.Table.polls: models.Poll.primary_keys(),
+    shared.Table.user_economies: models.UserEconomy.primary_keys(),
+    shared.Table.shop_items: models.ShopItem.primary_keys(),
+    shared.Table.global_shop_items: models.GlobalShopItem.primary_keys(),
+    shared.Table.match_results: models.MatchResult.primary_keys()
 }
 
 # Pre-defined mapping of tables that require in-memory auto-increment IDs to their column name
@@ -39,6 +41,7 @@ AUTO_INCREMENT_FIELDS = {
     shared.Table.polls: "poll_id",
     shared.Table.shop_items: "item_id",
     shared.Table.global_shop_items: "item_id",
+    shared.Table.match_results: "match_id",
 }
 
 class DatabaseManager:
@@ -73,6 +76,7 @@ class DatabaseManager:
         self.user_economies = []
         self.shop_items = []
         self.global_shop_items = []
+        self.match_results = []
 
         # O(1) lookup indices mapping table identifiers to primary key values
         self._index = {
@@ -118,9 +122,12 @@ class DatabaseManager:
 
         self.loop_task: asyncio.Task = asyncio.create_task(self._auto_commit_loop())
 
-    async def _auto_commit_loop(self) -> None:
+    async def _auto_commit_loop(self, seconds: int = 300) -> None:
         """
         Periodically flushes tracking changes.
+
+        Args:
+            seconds (int): The number of seconds to wait for each loop.
         """
         try:
             while True:
@@ -538,6 +545,28 @@ class DatabaseManager:
             item_ids = [item_ids]
         for item_id in item_ids:
             self._remove(shared.Table.global_shop_items, item_id)
+
+
+    def add_match_results(self, results: Union[List[models.MatchResult], models.MatchResult]) -> None:
+        """
+        Adds match results to cache storage.
+
+        Args:
+            results (Union[List[models.MatchResult], models.MatchResult]): Match results to add.
+        """
+        self._add(shared.Table.match_results, results)
+
+    def remove_match_results(self, match_result_ids: Union[List[int], int]) -> None:
+        """
+        Marks designated global item options as deleted.
+
+        Args:
+            match_result_ids (Union[List[int], int]): Target unique identifier or list of IDs.
+        """
+        if isinstance(match_result_ids, int): 
+            match_result_ids = [match_result_ids]
+        for match_result_id in match_result_ids:
+            self._remove(shared.Table.match_results, match_result_id)
 
 
     def initialize_database_model(self, table: shared.Table, **kwargs) -> Any:
