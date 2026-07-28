@@ -5,6 +5,7 @@ from cogs import agent, moderation, polls, statistics
 from cogs.economy import local as local_economy, global_eco as global_economy
 from cogs.admin import utilities as admin_utilities, database as admin_database, economy as admin_economy
 from cogs.minigames import basic as basic_minigames
+#from cogs.matchmaking import cog as matchmaking
 import discord
 from discord.ext import commands
 import json
@@ -40,7 +41,7 @@ async def setup_bot() -> None:
             guild_id=guild.id,
             owner_id=guild.owner_id,
             name=guild.name,
-            icon_url=str(guild.icon.url) if guild.icon else None,
+            icon_url=str(guild.icon.url) if guild.icon else "",
             member_count=guild.member_count,
             bot_count=sum(1 for m in guild.members if m.bot),
             is_available=True, # If the guild is available, the bot is a member of it
@@ -120,6 +121,7 @@ class ShirayumeBot(commands.Bot):
         await polls.setup()
         await statistics.setup()
         await basic_minigames.setup()
+        #await matchmaking.setup()
 
         await helpers.update_default_color()
         helpers.custom_print(
