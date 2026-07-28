@@ -75,6 +75,14 @@
         "polls": {
             "is_enabled": true,
             "max_active_per_user": 3
+        },
+        "matchmaking": {
+            "is_enabled": false,
+            "chess": {
+                "is_enabled": true,
+                "render_mode": "image",
+                "available_render_modes": ["ascii", "image"]
+            }
         }
     }
 }
